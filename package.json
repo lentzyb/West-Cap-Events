@@ -1,0 +1,16 @@
+{
+  "name": "wcl-event-registration",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^8.2.0",
+    "qrcode": "^1.5.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
