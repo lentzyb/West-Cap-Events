@@ -1,5 +1,0 @@
-Monday recruiting sync rules:
-- Orientation: all current records
-- Active Roster: only records with Start Date >= 2026-01-01
-- Combined results are deduplicated before event matching
-- Successful event recruit attributions remain permanently stored
