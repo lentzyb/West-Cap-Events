@@ -1,0 +1,4 @@
+MATCHING FIX
+- Primary match remains exact normalized email OR phone.
+- Added safe fallback: exact full name only when unique in both event registrations and Monday Orientation.
+- Successful fallback matches are persisted permanently, so later movement to Active Roster does not remove attribution.
