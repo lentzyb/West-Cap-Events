@@ -1,0 +1,6 @@
+WCL Monday Analytics session-auth fix
+
+This build issues a signed HttpOnly admin session cookie after a successful /auth login.
+Analytics accepts the existing x-admin-password header OR the signed session cookie.
+No Netlify environment-variable changes are required.
+After deployment, log out and log back in once so the browser receives the session cookie.
