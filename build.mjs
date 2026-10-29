@@ -1,0 +1,4 @@
+import { access } from "node:fs/promises";
+const requiredFiles=["netlify/functions/media.mjs","public/gallery-editor.js","public/monday-sources.js","public/notifications-admin.js","public/follow-up.html","public/follow-up.js","netlify/functions/_notifications.mjs","netlify/functions/notifications.mjs","netlify/functions/follow-up.mjs","netlify/functions/notification-worker-background.mjs","netlify/functions/notification-schedule.mjs","public/index.html","public/admin.html","public/admin.js","public/event.html","public/styles.css","public/event-page.css","public/event-page.js","public/page-editor.js","netlify/functions/_event-page.mjs","netlify/functions/_shared.mjs","netlify/functions/events.mjs","netlify/functions/registrations.mjs","netlify/functions/analytics.mjs","netlify/functions/attendees.mjs","netlify/functions/webhook-client.mjs"];
+for(const file of requiredFiles) await access(file);
+console.log("WCL Event Platform edit and analytics edition is ready.");
