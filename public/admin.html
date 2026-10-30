@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WCL Event Platform</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="admin-shell">
+  <header class="admin-header">
+    <div><p class="eyebrow">WEST CAPITAL LENDING</p><h1>Event Platform</h1></div>
+    <button id="logoutButton" class="button secondary" hidden>Log Out</button>
+  </header>
+
+  <section id="loginCard" class="card narrow">
+    <h2>Admin Login</h2>
+    <form id="loginForm">
+      <label>Password<input id="passwordInput" type="password" required autocomplete="current-password"></label>
+      <button class="button" type="submit">Log In</button>
+      <p id="loginMessage" class="message"></p>
+    </form>
+  </section>
+
+  <div id="dashboard" hidden>
+    <nav class="tabs">
+      <button class="tab active" data-tab="events">Events</button>
+      <button class="tab" data-tab="archived">Archived Events</button>
+      <button class="tab" data-tab="analytics">Analytics</button>
+      <button class="tab" data-tab="recruiters">Team Members</button>
+      <button class="tab" data-tab="webhooks">Bonzo Campaign Library</button>
+      <button class="tab" data-tab="followups">Recruiter Follow-up</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </nav>
+
+    <section id="tab-events" class="tab-panel">
+      <section class="card" id="eventEditorCard">
+        <div class="section-heading">
+          <div><h2 id="eventFormTitle">Create an Event</h2><p id="eventFormHelp">Select each team member and choose that person’s saved Bonzo campaign webhook.</p></div>
+          <button id="cancelEditButton" class="button secondary" type="button" hidden>Cancel Edit</button>
+        </div>
+        <form id="eventForm">
+          <input type="hidden" id="editingSlug" value="">
+          <div class="form-grid">
+            <label>Event Name<input name="name" required maxlength="100"></label>
+            <label>Custom URL Slug<input name="slug" placeholder="optional-event-url" maxlength="70"></label>
+            <label>Event Date<input name="date" type="date" required></label>
+            <label>Start Time<input name="startTime" type="time" required></label>
+            <label>End Time <span class="optional">Optional</span><input name="endTime" type="time"></label>
+            <label>Time Zone<select name="timeZone"><option value="America/Detroit">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Phoenix">Arizona Time</option><option value="America/Los_Angeles">Pacific Time</option></select></label>
+            <label class="full">Location<input name="location" maxlength="180"></label>
+            <label class="full">Description<textarea name="description" rows="3" maxlength="1000"></textarea></label>
+            <fieldset class="full"><legend>Team members and Bonzo campaigns</legend><p class="field-help">Choose the team members assigned to this event and the saved Bonzo campaign for each person.</p><button class="button secondary" type="button" id="openTeamPicker">Select Team Members</button><div id="selectedTeamSummary" class="selected-team-summary">No team members selected.</div><div id="eventRecruiters" class="route-grid" hidden></div></fieldset>
+<dialog id="teamPickerDialog" class="team-picker-dialog"><div class="team-picker-head"><div><h3>Select Team Members</h3><p>Choose one or more people and their Bonzo campaign.</p></div><button type="button" class="icon-button" id="closeTeamPicker" aria-label="Close">×</button></div><div id="teamPickerList" class="route-grid"></div><div class="team-picker-actions"><button type="button" class="button secondary" id="cancelTeamPicker">Cancel</button><button type="button" class="button" id="applyTeamPicker">Apply Team Members</button></div></dialog>
+          </div>
+          <div id="pageDesigner"></div>
+          <button id="saveEventButton" class="button" type="submit">Create Event</button>
+          <p id="eventFormMessage" class="message"></p>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="section-heading"><h2>Your Events</h2><button id="refreshButton" class="button secondary">Refresh</button></div>
+        <div id="eventsList" class="events-list"></div>
+      </section>
+    </section>
+
+    <section id="tab-archived" class="tab-panel" hidden>
+      <section class="card">
+        <div class="section-heading">
+          <div><h2>Archived Events</h2><p>Archived events are removed from the main Events screen but remain available for records, registrations, analytics, and restoration.</p></div>
+          <button id="refreshArchivedButton" class="button secondary">Refresh</button>
+        </div>
+        <div id="archivedEventsList" class="events-list"></div>
+      </section>
+    </section>
+
+    <section id="tab-analytics" class="tab-panel" hidden>
+      <section class="card">
+        <div class="section-heading"><div><h2>Event Recruiting Impact</h2><p>See which events produced West Cap candidates and how much recruited volume each event generated.</p></div><button id="refreshAnalyticsButton" class="button secondary">Sync Monday & Refresh</button></div>
+        <div id="analyticsSummary" class="metric-grid"></div>
+        <div id="mondaySyncStatus" class="monday-sync"></div>
+        <section id="mondaySourceReport" style="margin:28px 0"></section><section><h3>Event Performance</h3><div id="eventPerformanceTable"></div></section>
+        <div class="analytics-grid">
+          <section><h3>Registrations by Event</h3><div id="eventAnalyticsList" class="analytics-list"></div></section>
+          <section><h3>Team Member Leaderboard</h3><div id="recruiterLeaderboard" class="analytics-list"></div></section>
+        </div>
+      </section>
+    </section>
+
+    <section id="tab-recruiters" class="tab-panel" hidden>
+      <section class="card"><h2>Add a Team Member</h2><p>Add each person who may invite attendees. Calendly can also be added or changed later.</p><form id="recruiterForm"><div class="form-grid"><label>Name<input name="name" required maxlength="120"></label><label>Email for notifications<input name="email" type="email" maxlength="200"></label><label class="full">Calendly Scheduling Link <span class="optional">Optional</span><input name="calendlyUrl" type="url" maxlength="500" placeholder="https://calendly.com/name/intro-call"></label><label class="full check"><input name="showCalendly" type="checkbox"> Show this recruiter’s Calendly immediately after registration</label></div><button class="button" type="submit">Add Team Member</button><p id="recruiterMessage" class="message"></p></form></section>
+      <section class="card"><h2>Team Members</h2><div id="recruitersList" class="events-list"></div></section>
+    </section>
+
+    <section id="tab-webhooks" class="tab-panel" hidden>
+      <section class="card"><h2>Add a Bonzo Campaign Webhook</h2><p>Save each owner-and-campaign webhook once. You can reuse it on future events.</p><form id="webhookForm"><div class="form-grid"><label>Library Name<input name="name" required maxlength="140" placeholder="Broker Open - Brian"></label><label>Team Member<select id="webhookRecruiterId" name="recruiterId" required><option value="">Select a team member</option></select></label><label class="full">Bonzo Campaign Name<input name="campaignName" maxlength="140" placeholder="Broker Open Follow-Up"></label><label class="full">Bonzo Webhook URL<input name="webhookUrl" type="url" required maxlength="500" placeholder="https://app.getbonzo.com/api/webhook/..."></label></div><button class="button" type="submit">Save Webhook</button><p id="webhookMessage" class="message"></p></form></section>
+      <section class="card"><div class="section-heading"><div><h2>Campaign & Webhook Library</h2><p>Choose from these saved routes while creating events.</p></div></div><div id="webhooksList" class="events-list"></div></section>
+    </section>
+
+    <section id="tab-followups" class="tab-panel" hidden><section class="card"><h2>Recruiter follow-up</h2><p>One daily summary per recruiter until candidates reach Orientation. Stopping reminders preserves their event and ROI history.</p><div id="notificationSetup"></div><form id="notificationSettings"><div class="form-grid"><label>Notifications<select name="enabled"><option value="false">Off</option><option value="true">On</option></select></label><label>Daily summary hour<select name="hour"><option value="0">00:00</option><option value="1">01:00</option><option value="2">02:00</option><option value="3">03:00</option><option value="4">04:00</option><option value="5">05:00</option><option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option></select></label><label>Time zone<select name="timeZone"><option value="America/New_York">Eastern</option><option value="America/Chicago">Central</option><option value="America/Denver">Mountain</option><option value="America/Phoenix">Arizona</option><option value="America/Los_Angeles">Pacific</option></select></label></div><button class="button">Save notification settings</button></form><p id="notificationMessage" role="status"></p><button id="refreshNotifications" class="button secondary">Refresh</button> <button id="runNotifications" class="button secondary">Retry pending notifications</button><p id="notificationStatus" role="status"></p><div id="followupList"></div><h3>Recent delivery attempts</h3><div id="notificationDeliveries"></div></section></section>
+    <section id="tab-settings" class="tab-panel" hidden>
+      <section class="card"><h2>Monday.com Recruiting Analytics</h2><p>This is read-only. The event platform reads Hires and Candidate Source from your connected Monday board. It also recognizes Orientation and Active Roster when present. Candidates are matched to event registrations by email or phone; source totals show all items in Hires. SELECT SOURCE is shown as Not specified.</p><div id="mondayStatus" class="message">Not checked yet.</div><button id="loadMondayButton" class="button secondary" type="button">Check / Refresh Monday Connection</button><form id="mondayForm" hidden><div class="form-grid"><label>Email Column<select id="mondayEmail" required></select></label><label>Phone Column<select id="mondayPhone" required></select></label><label>Stage Column<select id="mondayStage" required></select></label><label>Production Volume Column<select id="mondayVolume"><option value="">No volume column yet</option></select></label><label class="full">Stages that count as Joined WCL<input id="mondayJoinedStages" value="Confirmed, Orientation" placeholder="Confirmed, Orientation"></label></div><button class="button" type="submit">Save Monday Mapping</button><p class="message" id="mondayMessage"></p></form><h3>Netlify variables required</h3><pre>MONDAY_API_TOKEN
+MONDAY_BOARD_ID</pre><p>The API token stays in Netlify and is never exposed in the browser or GitHub.</p></section>
+      <section class="card"><h2>Bonzo Webhook Integration</h2><div id="bonzoStatus">Loading…</div><h3>Netlify variable required</h3><pre>ADMIN_PASSWORD</pre><p><strong>BONZO_API_TOKEN is not used.</strong></p><ol><li>Create a campaign webhook in Bonzo for the correct owner.</li><li>Save it once in the Bonzo Campaign Library.</li><li>Choose it for that team member when creating or editing an event.</li></ol></section>
+    </section>
+  </div>
+</main>
+<script src="/admin.js?v=20261029-hires-source"></script>
+<script src="/monday-sources.js"></script>
+<script src="/notifications-admin.js"></script>
+<script src="/page-editor.js?v=20261029-gallery"></script>
+<script src="/gallery-editor.js?v=20261029-gallery"></script>
+<script src="/video-editor.js"></script></body>
+</html>
