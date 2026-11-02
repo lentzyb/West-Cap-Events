@@ -40,3 +40,11 @@ test('manual report API forwards a stable request ID and rejects invalid IDs',as
  let delivered;globalThis.fetch=async(url,opts)=>{delivered=JSON.parse(opts.body);return new Response(null,{status:202})};const id='11111111-1111-4111-8111-111111111111';const r=await notifications(request({action:'report-now',requestId:id}));assert.equal(r.status,200);assert.equal(delivered.reportRequestId,id);assert.equal(delivered.reportOnly,true);assert.equal(delivered.daily,false);
  assert.equal((await notifications(request({action:'report-now',requestId:'invalid'}))).status,400);
 });
+
+test('archived events are excluded from email, CSV and counts while stored history is preserved',async()=>{
+ await queueCandidate(candidate);testDB.set('registration:test:source1',candidate);testDB.set('attendee:test:extra',{...candidate,id:'extra',email:'extra@example.com',phone:'3135559999'});
+ testDB.set('event:test',{...ended,archived:true});
+ testDB.set('event:active',{...ended,slug:'active',name:'Current event'});await queueCandidate({...candidate,id:'current',eventSlug:'active',eventName:'Current event',email:'current@example.com'});
+ const snapshot=await reportSnapshot();assert.equal(snapshot.rows.length,1);assert.equal(snapshot.rows[0].eventSlug,'active');assert.equal(Object.values(snapshot.counts).reduce((a,b)=>a+b,0),1);
+ const message=reportEmail(snapshot,await reportConfig(),'2026-11-02');assert.ok(!message.html.includes('Why West Cap'));assert.ok(!reportCSV(snapshot).includes('Why West Cap'));assert.ok(testDB.has('registration:test:source1'));assert.ok(testDB.has('attendee:test:extra'));assert.ok([...testDB.values()].some(r=>r.sourceId==='source1'));
+});

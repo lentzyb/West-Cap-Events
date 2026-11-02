@@ -17,7 +17,7 @@ export async function reportSnapshot(){
   const event=eventMap.get(source.eventSlug),recruiter=recruiters.find(r=>r.id===source.recruiterId),outreach=outreachState(source,event,messages);
   rows.push({...source,recruiterName:recruiter?.name||'Unassigned',recruiterEmail:recruiter?.email||'',eventName:event?.name||source.eventName||source.eventSlug,status:source.importRemoved?'Removed from imported list':!event||event.archived?'Event archived':recruiter&&!recruiter.active?'Recruiter inactive':outreach.status,contactedAt:outreach.contactedAt||'',contactType:outreach.contactType||'',campaign:outreach.campaign||false});
  }
- const result=rows.map(r=>({...r,category:category(r,eventMap.get(r.eventSlug))})).sort((a,b)=>String(a.eventName||'').localeCompare(b.eventName||'')||String(a.recruiterName||'').localeCompare(b.recruiterName||'')||String(a.lastName||'').localeCompare(b.lastName||''));
+ const result=rows.filter(r=>eventMap.has(r.eventSlug)&&!eventMap.get(r.eventSlug).archived).map(r=>({...r,category:category(r,eventMap.get(r.eventSlug))})).sort((a,b)=>String(a.eventName||'').localeCompare(b.eventName||'')||String(a.recruiterName||'').localeCompare(b.recruiterName||'')||String(a.lastName||'').localeCompare(b.lastName||''));
  return {at:new Date().toISOString(),bonzo,rows:result,counts:Object.fromEntries(buckets.map(k=>[k,result.filter(r=>r.category===k).length]))};
 }
 function csvCell(value){let s=String(value??'');if(/^[\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"'}
