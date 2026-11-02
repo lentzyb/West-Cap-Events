@@ -51,7 +51,7 @@ export async function resolveMondayConfig(){
  const stage=columns.find(c=>c.id===saved.stageColumnId)||firstColumn(columns,['Stage','Status','Recruiting Stage']);
  const source=columns.find(c=>c.id===saved.sourceColumnId)||firstColumn(columns,['Candidate Source'])||firstColumn(columns,['Source','Recruiting Source','Lead Source','Referral Source']);
  const startDate=firstColumn(columns,['Start Date','Employee Start Date','Hire Date']);
- const volume=columns.find(c=>c.id===saved.volumeColumnId)||firstColumn(columns,['Production Volume','Annual Volume','Previous Volume','12 Month Volume','12-Month Volume','TTM Volume','Volume'])||fuzzyColumn(columns,['production volume','annual volume','previous volume','12 month volume','ttm volume']);
+ const volume=firstColumn(columns,['MMI 14mo Vol'])||columns.find(c=>c.id===saved.volumeColumnId)||firstColumn(columns,['Production Volume','Annual Volume','Previous Volume','12 Month Volume','12-Month Volume','TTM Volume','Volume'])||fuzzyColumn(columns,['production volume','annual volume','previous volume','12 month volume','ttm volume']);
  const config={...saved,emailColumnId:email?.id||'',phoneColumnId:phone?.id||'',stageColumnId:stage?.id||'',sourceColumnId:source?.id||'',volumeColumnId:volume?.id||''};
  return {board,columns,config,detected:{source:source?{id:source.id,title:source.title,type:source.type}:null,email:email?{id:email.id,title:email.title}:null,phone:phone?{id:phone.id,title:phone.title}:null,stage:stage?{id:stage.id,title:stage.title}:null,startDate:startDate?{id:startDate.id,title:startDate.title}:null,volume:volume?{id:volume.id,title:volume.title}:null}};
 }

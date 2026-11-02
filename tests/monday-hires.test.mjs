@@ -32,3 +32,17 @@ test('starred Personal Email and Personal Phone headers detect and match real co
  const d=await getConversionData([{id:'r1',email:'person@example.com',phone:'3135551212'}]);
  assert.equal(d.configured,true);assert.equal(d.detected.email.title,'Personal Email*');assert.equal(d.detected.phone.title,'Personal Phone*');assert.equal(d.matches[0].mondayItemId,'m1');assert.equal(d.sourceReport.totalHires,2);
 });
+
+test('MMI 14mo Vol* is preferred over generic saved volume and parses currency',async()=>{
+ board.columns.push({id:'mmi14',title:'MMI 14mo Vol*',type:'numbers'});items[0].column_values.push({id:'mmi14',text:'$25,000,000'});
+ testDB.set('config:monday',{boardId:'18424671786',volumeColumnId:'volume'});
+ const d=await getConversionData([{id:'r1',email:'person@example.com'}]);assert.equal(d.detected.volume.title,'MMI 14mo Vol*');assert.equal(d.matches[0].volume,25000000);assert.equal(d.sourceReport.hires.find(x=>x.id==='m1').volume,25000000);
+});
+test('Analytics refresh captures MMI volume on an already matched candidate without increasing hire count',async()=>{
+ testDB.set('event:why-west-cap',{slug:'why-west-cap',name:'Why West Cap'});testDB.set('registration:why-west-cap:r1',{id:'reg1',firstName:'Test',lastName:'Person',email:'person@example.com',eventSlug:'why-west-cap',eventName:'Why West Cap',createdAt:'2026-10-29T12:00:00Z'});
+ board.columns=board.columns.filter(c=>c.id!=='volume');items[0].column_values=items[0].column_values.filter(c=>c.id!=='volume');
+ const req=()=>new Request('https://test.local/analytics',{method:'POST',headers:{'content-type':'application/json','x-admin-password':'test-admin'},body:'{}'});
+ const before=await (await analytics(req())).json();assert.equal(before.summary.joined,1);assert.equal(before.summary.totalVolume,0);
+ board.columns.push({id:'mmi14',title:'MMI 14mo Vol*',type:'numbers'});items[0].column_values.push({id:'mmi14',text:'$25,000,000'});
+ const after=await (await analytics(req())).json();assert.equal(after.summary.joined,1);assert.equal(after.summary.totalVolume,25000000);assert.equal(after.events[0].volume,25000000);
+});
