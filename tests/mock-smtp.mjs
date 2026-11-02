@@ -1,0 +1,1 @@
+export default {createTransport(options){globalThis.testSMTPOptions=options;return {sendMail:async payload=>{if(typeof globalThis.testSendMail!=='function')throw Error('Unexpected SMTP call during tests');return globalThis.testSendMail(payload)},close(){globalThis.testSMTPClosed=true}}}};

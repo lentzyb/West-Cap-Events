@@ -1,0 +1,1 @@
+Mobile QR registrations: after successful registration, display a Schedule Your Call link to the selected team member Calendly page. Desktop retains inline widget with a direct-link fallback. Existing CRM registration flow unchanged.
