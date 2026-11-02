@@ -1,0 +1,8 @@
+Monday recruiting analytics update
+- Reads both Orientation and Active Roster groups.
+- Combines and deduplicates Monday items by item ID before matching.
+- A matched Monday candidate is permanently stored using the Monday item ID, not the registration ID.
+- Multiple event registrations for the same Monday candidate do not create multiple recruits.
+- Moving a candidate from Orientation to Active Roster does not increase the recruit count.
+- Historical saved recruit attribution remains after the candidate later leaves either group.
+- Existing older saved attributions are deduplicated during reporting by Monday item ID when available.

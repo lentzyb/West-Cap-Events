@@ -1,0 +1,1 @@
+export async function resolve(specifier,context,next){if(specifier==='nodemailer')return {url:new URL('./mock-smtp.mjs',import.meta.url).href,shortCircuit:true};if(specifier==='@netlify/blobs')return {url:new URL('./mock-store.mjs',import.meta.url).href,shortCircuit:true};return next(specifier,context)}
