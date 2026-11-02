@@ -39,7 +39,7 @@ export async function getRecruitingItems(board,columnIds=[],startDateColumnId=''
 
 const cv=(item,id)=>item.column_values?.find(c=>c.id===id)?.text||'';
 const normalizeName=v=>String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
-const normTitle=v=>String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,' ');
+const normTitle=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const firstColumn=(columns,names)=>{const wanted=names.map(normTitle);return columns.find(c=>wanted.includes(normTitle(c.title)))||null};
 const fuzzyColumn=(columns,terms)=>columns.find(c=>terms.some(t=>normTitle(c.title).includes(t)))||null;
 export async function resolveMondayConfig(){
@@ -47,7 +47,7 @@ export async function resolveMondayConfig(){
  const board=await getBoardMeta(saved.boardId);
  const columns=board.columns||[];
  const email=columns.find(c=>c.id===saved.emailColumnId)||firstColumn(columns,['Personal Email','Email','Email Address']);
- const phone=columns.find(c=>c.id===saved.phoneColumnId)||firstColumn(columns,['Cell Phone','Phone','Phone Number','Mobile Phone']);
+ const phone=columns.find(c=>c.id===saved.phoneColumnId)||firstColumn(columns,['Personal Phone','Cell Phone','Phone','Phone Number','Mobile Phone']);
  const stage=columns.find(c=>c.id===saved.stageColumnId)||firstColumn(columns,['Stage','Status','Recruiting Stage']);
  const source=columns.find(c=>c.id===saved.sourceColumnId)||firstColumn(columns,['Candidate Source'])||firstColumn(columns,['Source','Recruiting Source','Lead Source','Referral Source']);
  const startDate=firstColumn(columns,['Start Date','Employee Start Date','Hire Date']);

@@ -25,3 +25,10 @@ test('saved board remains available when no Netlify override exists',async()=>{
  delete process.env.MONDAY_BOARD_ID;testDB.set('config:monday',{boardId:'456',emailColumnId:'custom_email'});
  const c=await getMondayConfig();assert.equal(c.boardId,'456');assert.equal(c.emailColumnId,'custom_email');
 });
+
+test('starred Personal Email and Personal Phone headers detect and match real contact values',async()=>{
+ board.columns.find(c=>c.id==='email').title='Personal Email*';board.columns.find(c=>c.id==='phone').title='Personal Phone*';
+ items[0].column_values.push({id:'phone',text:'3135551212'});
+ const d=await getConversionData([{id:'r1',email:'person@example.com',phone:'3135551212'}]);
+ assert.equal(d.configured,true);assert.equal(d.detected.email.title,'Personal Email*');assert.equal(d.detected.phone.title,'Personal Phone*');assert.equal(d.matches[0].mondayItemId,'m1');assert.equal(d.sourceReport.totalHires,2);
+});
