@@ -1,1 +1,0 @@
-Archived events are excluded from new outreach report emails, counts and CSV exports. Existing event records, candidates and ROI history are retained. Deploy the complete project to the existing site and use Send fresh report now for a new snapshot. Already sent emails do not change. All previous updates included. 16 report tests and build passed.
