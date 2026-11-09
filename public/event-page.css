@@ -20,56 +20,70 @@ html{scroll-behavior:smooth;scroll-padding-top:90px}.event-page{--accent:#d8b777
 
 #recruiterField[hidden] { display: none; }
 
-/* Seasonal backgrounds sit behind the event content and uploaded covers. */
-.event-page[data-seasonal-theme="christmas"] {
-  --surface: #19382d;
-  --ink: #fff8e9;
-  --subtle: #dbe8df;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23e5c17c%22%20opacity%3D%22.23%22%3E%3Cpath%20d%3D%22M41%200v30m0%200h-5v6h10v-6z%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2252%22%20r%3D%2216%22%2F%3E%3Cpath%20d%3D%22M27%2050q14%2010%2028%200M150%2098v22%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22132%22%20r%3D%2212%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23e08e8e%22%20opacity%3D%22.18%22%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2252%22%20r%3D%2215%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22132%22%20r%3D%2211%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M94%20129l12-21%2012%2021h-6l11%2018H89l11-18z%22%20fill%3D%22%239fceb0%22%20opacity%3D%22.19%22%2F%3E%3C%2Fsvg%3E") repeat,
-              radial-gradient(ellipse at top right, #34191f, transparent 75%), #102d24;
+.event-page[data-seasonal-theme]:not([data-seasonal-theme="none"]) {
+  background-color: var(--season-base);
+  background-image: var(--season-art, none),
+    radial-gradient(ellipse at top right, var(--season-glow), transparent 75%);
+  background-position: top right, center top;
+  background-repeat: no-repeat;
+  background-size: min(48vw, 520px) auto, 100% 100%;
+  --surface: var(--season-card);
+  --ink: var(--season-ink);
+  --subtle: var(--season-muted);
 }
-.event-page[data-seasonal-theme="winter"] {
-  --surface: #1b3149;
-  --ink: #f4f9ff;
-  --subtle: #d1e1ee;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23d6eeff%22%20stroke-width%3D%221.3%22%20opacity%3D%22.24%22%3E%3Cpath%20d%3D%22M40%2018v36m-16-27%2032%2018m0-18L24%2045m112%2065v26m-11-19%2022%2013m0-13-22%2013%22%2F%3E%3Cpath%20d%3D%22m36%2023%204%205%204-5m-8%2026%204-5%204%205%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23fff%22%20opacity%3D%22.28%22%3E%3Ccircle%20cx%3D%2292%22%20cy%3D%2257%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%22170%22%20cy%3D%2225%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%2267%22%20cy%3D%22128%22%20r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat,
-              radial-gradient(ellipse at top right, #254761, transparent 75%), #101f37;
+.event-page[data-seasonal-theme]:not([data-seasonal-theme="none"]) .event-hero h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  letter-spacing: -.045em;
 }
-.event-page[data-seasonal-theme="spring"] {
-  --surface: #fffaf8;
-  --ink: #253c31;
-  --subtle: #425c4f;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22%23c56d94%22%20opacity%3D%22.16%22%3E%3Ccircle%20cx%3D%2234%22%20cy%3D%2231%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2239%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2251%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2227%22%20cy%3D%2250%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2224%22%20cy%3D%2238%22%20r%3D%228%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2234%22%20cy%3D%2241%22%20r%3D%224%22%20fill%3D%22%23d6a24e%22%20opacity%3D%22.35%22%2F%3E%3Cpath%20d%3D%22M130%20112q36-14%2032-35-23%201-32%2035m-4%207q-27-3-30-25%2024-2%2030%2025%22%20fill%3D%22%23569775%22%20opacity%3D%22.18%22%2F%3E%3C%2Fsvg%3E") repeat,
-              radial-gradient(ellipse at top right, #fae8ef, transparent 75%), #e9f4e8;
-}
-.event-page[data-seasonal-theme="summer"] {
-  --surface: #faffff;
-  --ink: #153c47;
-  --subtle: #3d6068;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20stroke%3D%22%23bc792b%22%20fill%3D%22none%22%20opacity%3D%22.22%22%3E%3Ccircle%20cx%3D%2245%22%20cy%3D%2240%22%20r%3D%2213%22%2F%3E%3Cpath%20d%3D%22M45%2020v-6m0%2046v6M25%2040h-6m46%200h6m-40-14-5-5m33%2033%205%205m-33-5-5%205m33-33%205-5%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M101%20108q11-10%2022%200t22%200%2022%200m-66%2010q11-10%2022%200t22%200%2022%200%22%20fill%3D%22none%22%20stroke%3D%22%23298e9b%22%20opacity%3D%22.20%22%2F%3E%3C%2Fsvg%3E") repeat,
-              radial-gradient(ellipse at top right, #d9f4f1, transparent 75%), #fff1d0;
-}
-.event-page[data-seasonal-theme="fall"] {
-  --surface: #fff8ee;
-  --ink: #502e23;
-  --subtle: #684637;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22%23a6512d%22%20opacity%3D%22.19%22%3E%3Cpath%20d%3D%22M35%2060q1-31%2035-41-1%2033-35%2041m0%200-7%207%22%2F%3E%3Cpath%20d%3D%22M134%20108q17-25%2042-16-11%2029-42%2016%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M70%20119q-30-6-29-31%2029%201%2029%2031%22%20fill%3D%22%23c98731%22%20opacity%3D%22.25%22%2F%3E%3C%2Fsvg%3E") repeat,
-              radial-gradient(ellipse at top right, #f4ede0, transparent 75%), #f9dfc6;
-}
-.event-page[data-seasonal-theme="halloween"] {
-  --surface: #30233c;
-  --ink: #fff4e9;
-  --subtle: #e4d4e8;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22%23f39c50%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M47%2042c-22-13-30%2026%200%2028%2030-2%2022-41%200-28z%22%2F%3E%3Cpath%20d%3D%22M44%2042l3-10%205%202-4%209z%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M118%20108q14-8%2024%204l4-8%204%208q10-12%2024-4-12%203-14%2013-7-4-14%204-7-8-14-4-2-10-14-13%22%20fill%3D%22%23d6acee%22%20opacity%3D%22.23%22%2F%3E%3C%2Fsvg%3E") repeat,
-              radial-gradient(ellipse at top right, #422319, transparent 75%), #24182f;
-}
-.event-page[data-seasonal-theme="new-year"] {
-  --surface: #232744;
-  --ink: #fff8e9;
-  --subtle: #e1d8ef;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20stroke%3D%22%23f4cd7f%22%20fill%3D%22none%22%20opacity%3D%22.32%22%3E%3Cpath%20d%3D%22M43%2017v38m-19-19h38m-32-13%2026%2026m-26%200%2026-26m95%2075v28m-14-14h28%22%2F%3E%3Cpath%20d%3D%22m93%2080%203-8%203%208%208%203-8%203-3%208-3-8-8-3z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23f4cd7f%22%20opacity%3D%22.22%22%3E%3Ccircle%20cx%3D%22117%22%20cy%3D%2236%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%22131%22%20r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat,
-              radial-gradient(ellipse at top right, #34274b, transparent 75%), #14172c;
-}
-.event-page:is([data-seasonal-theme="spring"], [data-seasonal-theme="summer"], [data-seasonal-theme="fall"]) .eyebrow {
+.event-page[data-seasonal-theme]:not([data-seasonal-theme="none"]) .eyebrow {
   color: var(--ink);
 }
+.event-page[data-seasonal-theme="christmas"] {
+  --season-art: url("/seasonal-evergreen.svg");
+}
+.event-page[data-seasonal-theme="christmas"] .registration-card {
+  border: 1px solid #a67b44;
+  box-shadow: 0 14px 38px #21191020;
+}
+.event-page[data-seasonal-theme="christmas"] { --season-base: #f5ecdf; --season-glow: #e6c9a1; --season-card: #fff9ee; --season-ink: #15372c; --season-muted: #496255; }
+.event-page[data-seasonal-theme="christmas"][data-seasonal-variant="2"] { --season-base: #41191f; --season-glow: #73353d; --season-card: #56232c; --season-ink: #fff6e9; --season-muted: #edcfd0; }
+.event-page[data-seasonal-theme="christmas"][data-seasonal-variant="3"] { --season-base: #132e25; --season-glow: #385344; --season-card: #203e33; --season-ink: #fff7e8; --season-muted: #d6e3d8; }
+.event-page[data-seasonal-theme="christmas"][data-seasonal-variant="4"] { --season-base: #f6ecda; --season-glow: #e9d3a1; --season-card: #fff9ef; --season-ink: #47352a; --season-muted: #66554a; }
+.event-page[data-seasonal-theme="christmas"][data-seasonal-variant="5"] { --season-base: #171a1b; --season-glow: #46322a; --season-card: #272829; --season-ink: #fff7e9; --season-muted: #dcd3c4; }
+.event-page[data-seasonal-theme="winter"] { --season-art: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23d6eeff%22%20stroke-width%3D%221.3%22%20opacity%3D%22.24%22%3E%3Cpath%20d%3D%22M40%2018v36m-16-27%2032%2018m0-18L24%2045m112%2065v26m-11-19%2022%2013m0-13-22%2013%22%2F%3E%3Cpath%20d%3D%22m36%2023%204%205%204-5m-8%2026%204-5%204%205%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23fff%22%20opacity%3D%22.28%22%3E%3Ccircle%20cx%3D%2292%22%20cy%3D%2257%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%22170%22%20cy%3D%2225%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%2267%22%20cy%3D%22128%22%20r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"); }
+.event-page[data-seasonal-theme="winter"] { --season-base: #101f37; --season-glow: #254761; --season-card: #1b3149; --season-ink: #f4f9ff; --season-muted: #d1e1ee; }
+.event-page[data-seasonal-theme="winter"][data-seasonal-variant="2"] { --season-base: #e8f3fa; --season-glow: #c3dde9; --season-card: #f7fcff; --season-ink: #18394e; --season-muted: #426279; }
+.event-page[data-seasonal-theme="winter"][data-seasonal-variant="3"] { --season-base: #302923; --season-glow: #53443d; --season-card: #40362e; --season-ink: #fff5e6; --season-muted: #e4d3c5; }
+.event-page[data-seasonal-theme="winter"][data-seasonal-variant="4"] { --season-base: #edf0f4; --season-glow: #d8e2e8; --season-card: #ffffff; --season-ink: #25333e; --season-muted: #4e6574; }
+.event-page[data-seasonal-theme="winter"][data-seasonal-variant="5"] { --season-base: #223c43; --season-glow: #4c6d75; --season-card: #29454e; --season-ink: #f1f9fa; --season-muted: #c9dfe3; }
+.event-page[data-seasonal-theme="spring"] { --season-art: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22%23c56d94%22%20opacity%3D%22.16%22%3E%3Ccircle%20cx%3D%2234%22%20cy%3D%2231%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2239%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2251%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2227%22%20cy%3D%2250%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2224%22%20cy%3D%2238%22%20r%3D%228%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2234%22%20cy%3D%2241%22%20r%3D%224%22%20fill%3D%22%23d6a24e%22%20opacity%3D%22.35%22%2F%3E%3Cpath%20d%3D%22M130%20112q36-14%2032-35-23%201-32%2035m-4%207q-27-3-30-25%2024-2%2030%2025%22%20fill%3D%22%23569775%22%20opacity%3D%22.18%22%2F%3E%3C%2Fsvg%3E"); }
+.event-page[data-seasonal-theme="spring"] { --season-base: #e9f4e8; --season-glow: #fae8ef; --season-card: #fffaf8; --season-ink: #253c31; --season-muted: #425c4f; }
+.event-page[data-seasonal-theme="spring"][data-seasonal-variant="2"] { --season-base: #f8e8eb; --season-glow: #f5d4db; --season-card: #fff9fa; --season-ink: #542f3c; --season-muted: #704a58; }
+.event-page[data-seasonal-theme="spring"][data-seasonal-variant="3"] { --season-base: #eee9f7; --season-glow: #ddd1ec; --season-card: #fbf8ff; --season-ink: #362850; --season-muted: #59466c; }
+.event-page[data-seasonal-theme="spring"][data-seasonal-variant="4"] { --season-base: #e8eee1; --season-glow: #c9dcc0; --season-card: #f7faf4; --season-ink: #2d4734; --season-muted: #526454; }
+.event-page[data-seasonal-theme="spring"][data-seasonal-variant="5"] { --season-base: #fff4d9; --season-glow: #f7deac; --season-card: #fffbf0; --season-ink: #4a3823; --season-muted: #6c5536; }
+.event-page[data-seasonal-theme="summer"] { --season-art: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20stroke%3D%22%23bc792b%22%20fill%3D%22none%22%20opacity%3D%22.22%22%3E%3Ccircle%20cx%3D%2245%22%20cy%3D%2240%22%20r%3D%2213%22%2F%3E%3Cpath%20d%3D%22M45%2020v-6m0%2046v6M25%2040h-6m46%200h6m-40-14-5-5m33%2033%205%205m-33-5-5%205m33-33%205-5%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M101%20108q11-10%2022%200t22%200%2022%200m-66%2010q11-10%2022%200t22%200%2022%200%22%20fill%3D%22none%22%20stroke%3D%22%23298e9b%22%20opacity%3D%22.20%22%2F%3E%3C%2Fsvg%3E"); }
+.event-page[data-seasonal-theme="summer"] { --season-base: #fff1d0; --season-glow: #d9f4f1; --season-card: #faffff; --season-ink: #153c47; --season-muted: #3d6068; }
+.event-page[data-seasonal-theme="summer"][data-seasonal-variant="2"] { --season-base: #fae5c8; --season-glow: #f1ae82; --season-card: #fff6e8; --season-ink: #5c3225; --season-muted: #704b3f; }
+.event-page[data-seasonal-theme="summer"][data-seasonal-variant="3"] { --season-base: #133e34; --season-glow: #3d7460; --season-card: #225346; --season-ink: #fff8de; --season-muted: #d5e9dc; }
+.event-page[data-seasonal-theme="summer"][data-seasonal-variant="4"] { --season-base: #dff4f7; --season-glow: #b8e5ef; --season-card: #f7feff; --season-ink: #163f52; --season-muted: #3f606c; }
+.event-page[data-seasonal-theme="summer"][data-seasonal-variant="5"] { --season-base: #f5eddd; --season-glow: #c8ddeb; --season-card: #fffaf0; --season-ink: #193c58; --season-muted: #456075; }
+.event-page[data-seasonal-theme="fall"] { --season-art: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22%23a6512d%22%20opacity%3D%22.19%22%3E%3Cpath%20d%3D%22M35%2060q1-31%2035-41-1%2033-35%2041m0%200-7%207%22%2F%3E%3Cpath%20d%3D%22M134%20108q17-25%2042-16-11%2029-42%2016%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M70%20119q-30-6-29-31%2029%201%2029%2031%22%20fill%3D%22%23c98731%22%20opacity%3D%22.25%22%2F%3E%3C%2Fsvg%3E"); }
+.event-page[data-seasonal-theme="fall"] { --season-base: #f9dfc6; --season-glow: #f4ede0; --season-card: #fff8ee; --season-ink: #502e23; --season-muted: #684637; }
+.event-page[data-seasonal-theme="fall"][data-seasonal-variant="2"] { --season-base: #592e22; --season-glow: #955635; --season-card: #6e3929; --season-ink: #fff2df; --season-muted: #f0d7c1; }
+.event-page[data-seasonal-theme="fall"][data-seasonal-variant="3"] { --season-base: #371d24; --season-glow: #62313e; --season-card: #4d2832; --season-ink: #fff3e8; --season-muted: #e8cdd4; }
+.event-page[data-seasonal-theme="fall"][data-seasonal-variant="4"] { --season-base: #f4e9d3; --season-glow: #e8cc9e; --season-card: #fffaf0; --season-ink: #4f3925; --season-muted: #6d563c; }
+.event-page[data-seasonal-theme="fall"][data-seasonal-variant="5"] { --season-base: #23362a; --season-glow: #4f5940; --season-card: #314737; --season-ink: #f9f2df; --season-muted: #d4deca; }
+.event-page[data-seasonal-theme="halloween"] { --season-art: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22%23f39c50%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M47%2042c-22-13-30%2026%200%2028%2030-2%2022-41%200-28z%22%2F%3E%3Cpath%20d%3D%22M44%2042l3-10%205%202-4%209z%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M118%20108q14-8%2024%204l4-8%204%208q10-12%2024-4-12%203-14%2013-7-4-14%204-7-8-14-4-2-10-14-13%22%20fill%3D%22%23d6acee%22%20opacity%3D%22.23%22%2F%3E%3C%2Fsvg%3E"); }
+.event-page[data-seasonal-theme="halloween"] { --season-base: #24182f; --season-glow: #422319; --season-card: #30233c; --season-ink: #fff4e9; --season-muted: #e4d4e8; }
+.event-page[data-seasonal-theme="halloween"][data-seasonal-variant="2"] { --season-base: #201527; --season-glow: #4c2d59; --season-card: #35203f; --season-ink: #faf0ff; --season-muted: #e4cde9; }
+.event-page[data-seasonal-theme="halloween"][data-seasonal-variant="3"] { --season-base: #3d2119; --season-glow: #763a21; --season-card: #562e22; --season-ink: #fff0df; --season-muted: #eed0ba; }
+.event-page[data-seasonal-theme="halloween"][data-seasonal-variant="4"] { --season-base: #202f29; --season-glow: #42533b; --season-card: #2a4136; --season-ink: #f5f2dd; --season-muted: #d8dfc8; }
+.event-page[data-seasonal-theme="halloween"][data-seasonal-variant="5"] { --season-base: #171e32; --season-glow: #394864; --season-card: #252d44; --season-ink: #f1f4fd; --season-muted: #d3daef; }
+.event-page[data-seasonal-theme="new-year"] { --season-art: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20stroke%3D%22%23f4cd7f%22%20fill%3D%22none%22%20opacity%3D%22.32%22%3E%3Cpath%20d%3D%22M43%2017v38m-19-19h38m-32-13%2026%2026m-26%200%2026-26m95%2075v28m-14-14h28%22%2F%3E%3Cpath%20d%3D%22m93%2080%203-8%203%208%208%203-8%203-3%208-3-8-8-3z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23f4cd7f%22%20opacity%3D%22.22%22%3E%3Ccircle%20cx%3D%22117%22%20cy%3D%2236%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%22131%22%20r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"); }
+.event-page[data-seasonal-theme="new-year"] { --season-base: #14172c; --season-glow: #34274b; --season-card: #232744; --season-ink: #fff8e9; --season-muted: #e1d8ef; }
+.event-page[data-seasonal-theme="new-year"][data-seasonal-variant="2"] { --season-base: #19252d; --season-glow: #3c5262; --season-card: #263742; --season-ink: #f4faff; --season-muted: #d4e2eb; }
+.event-page[data-seasonal-theme="new-year"][data-seasonal-variant="3"] { --season-base: #221d19; --season-glow: #604b2d; --season-card: #382d22; --season-ink: #fff6e1; --season-muted: #e8dac2; }
+.event-page[data-seasonal-theme="new-year"][data-seasonal-variant="4"] { --season-base: #402432; --season-glow: #734359; --season-card: #543246; --season-ink: #fff2f6; --season-muted: #eed2de; }
+.event-page[data-seasonal-theme="new-year"][data-seasonal-variant="5"] { --season-base: #112f2a; --season-glow: #345b49; --season-card: #1c4238; --season-ink: #fff8e5; --season-muted: #d0e7da; }

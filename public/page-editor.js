@@ -5,7 +5,7 @@ root.innerHTML=`<fieldset style="margin:24px 0"><legend>Design your event page</
 <label class="full">Headline override<input data-page="headline" placeholder="Leave blank to use the event name" maxlength="160"></label>
 <label>Seasonal theme<select data-page="seasonalTheme">
 <option value="none">None — use your color palette</option>
-<option value="christmas">Christmas — evergreen &amp; ornaments</option>
+<option value="christmas">Christmas</option>
 <option value="winter">Winter — midnight snow</option>
 <option value="spring">Spring — garden blossoms</option>
 <option value="summer">Summer — sun &amp; waves</option>
@@ -13,6 +13,7 @@ root.innerHTML=`<fieldset style="margin:24px 0"><legend>Design your event page</
 <option value="halloween">Halloween — pumpkins at dusk</option>
 <option value="new-year">New Year — midnight sparkles</option>
 </select><span class="field-help">Seasonal themes set the page background and card colors. You can still pick an accent and add your own cover.</span></label>
+<label id="seasonalVariantField" style="display:none">Seasonal look<select data-page="seasonalVariant"></select></label>
 <label>Color palette<select data-page="palette"><option value="classic">Midnight &amp; Gold</option><option value="navy">Navy &amp; Ice Blue</option><option value="cream">Cream &amp; Navy</option><option value="charcoal">Charcoal &amp; Silver</option><option value="forest">Forest &amp; Champagne</option><option value="burgundy">Burgundy &amp; Rose</option><option value="terracotta">Terracotta &amp; Cream</option><option value="custom">Custom</option></select></label><label>Cover image shape<select data-page="coverShape"><option value="arch">Arched — current style</option><option value="square">Square crop</option><option value="full">Full image — no cropping</option><option value="circle">Circular crop</option></select></label><label>Theme<select data-page="theme"><option value="dark">Midnight / warm gold</option><option value="light">Cream / navy</option></select></label><label>Accent color<input data-page="accent" type="color" value="#d8b777"></label>
 <label>Cover format<select data-page="coverType"><option value="image">Image</option><option value="video">Video</option></select></label><label class="full">Cover video link<input data-page="coverVideo" placeholder="https://…/clip.mp4"></label><label class="full">Or upload a cover video (MP4 / WebM, up to 4 MB)<input id="coverVideoUpload" type="file" accept="video/mp4,video/webm"><span id="coverVideoStatus" role="status"></span></label><p class="full">Cover videos loop silently behind the title. Add a cover photo below as a fallback. Use a direct MP4/WebM link for larger videos.</p><label class="full">Cover image URL<input data-page="cover" placeholder="https://…"></label><label class="full">Or upload a cover photo (up to 1 MB)<input id="coverUpload" type="file" accept="image/jpeg,image/png,image/webp"><span id="coverUploadStatus" role="status"></span></label>
 <label class="full">Video URL<input data-page="video" placeholder="YouTube, Vimeo, or direct HTTPS .mp4 / .webm"></label>
@@ -24,11 +25,29 @@ root.innerHTML=`<fieldset style="margin:24px 0"><legend>Design your event page</
 <label class="full">FAQs — one per line: Question | Answer<textarea data-page="faqs" rows="3" placeholder="Can I bring a guest? | Absolutely—have them register too."></textarea></label>
 <label class="full">Parking / arrival instructions<textarea data-page="arrival" rows="3" maxlength="2000"></textarea></label>
 </div><p>Section order — move sections up or down. Empty sections remain hidden.</p><div id="sectionOrder"></div><button class="button secondary" type="button" id="previewEventPage">Preview unsaved page ↗</button><p id="previewMessage" role="status"></p></div></fieldset>`;
+const seasonalLooks = {
+  christmas: ["Evergreen & Ivory", "Burgundy Gala", "Candlelit Evergreen", "Champagne Noel", "Black Tie Christmas"],
+  winter: ["Midnight Snow", "Glacier Blue", "Alpine Lodge", "Silver Frost", "Twilight Pines"],
+  spring: ["Garden Party", "Cherry Blossom", "Lavender Garden", "Fresh Sage", "Spring Citrus"],
+  summer: ["Coastal Morning", "Golden Hour", "Palm Terrace", "Poolside Blue", "Mediterranean"],
+  fall: ["Autumn Estate", "Cider & Copper", "Maple Evening", "Harvest Cream", "Woodland"],
+  halloween: ["Velvet Dusk", "Midnight Masquerade", "Pumpkin & Copper", "Gothic Garden", "Moonlit Manor"],
+  "new-year": ["Midnight Champagne", "Silver Soirée", "Art Deco Gold", "Rose Sparkle", "Emerald Countdown"]
+};
+const seasonalTheme = root.querySelector('[data-page="seasonalTheme"]');
+const seasonalVariant = root.querySelector('[data-page="seasonalVariant"]');
+function updateSeasonalLooks(value = "1") {
+  const looks = seasonalLooks[seasonalTheme.value] ?? [];
+  document.getElementById("seasonalVariantField").style.display = looks.length ? "" : "none";
+  seasonalVariant.replaceChildren(...looks.map((name, index) => new Option(name, String(index + 1))));
+  if (looks.length) seasonalVariant.value = looks[Number(value) - 1] ? value : "1";
+}
+seasonalTheme.onchange = () => updateSeasonalLooks();
 let order=['highlights','video','hosts','agenda','gallery','faqs'];
 function draw(){const box=document.getElementById('sectionOrder');box.replaceChildren();order.forEach((name,i)=>{const row=document.createElement('div');row.style='display:flex;gap:12px;align-items:center;margin-bottom:8px';const label=document.createElement('strong');label.textContent=name;label.style='min-width:100px;text-transform:capitalize';row.append(label);[-1,1].forEach(delta=>{const b=document.createElement('button');b.type='button';b.className='button secondary';b.textContent=delta<0?'↑':'↓';b.setAttribute('aria-label',`Move ${name} ${delta<0?'up':'down'}`);b.disabled=i+delta<0||i+delta>=order.length;b.onclick=()=>{[order[i],order[i+delta]]=[order[i+delta],order[i]];draw()};row.append(b)});box.append(row)})}
 function updateVisibility(){document.getElementById("websiteOptions").hidden=root.querySelector('[data-page="enabled"]').value!=="true"}
 root.querySelector('[data-page="enabled"]').onchange=updateVisibility;
-window.pageEditor={read(){const p={sectionOrder:[...order]};root.querySelectorAll('[data-page]').forEach(el=>p[el.dataset.page]=['countdown','enabled'].includes(el.dataset.page)?el.value==='true':el.value);return p},set(p){root.querySelectorAll('[data-page]').forEach(el=>el.value=p[el.dataset.page]??({palette:'classic',seasonalTheme:'none',coverShape:'arch',coverType:'image',theme:'dark',accent:'#d8b777',countdown:true,enabled:false}[el.dataset.page]??''));order=[...new Set([...(p.sectionOrder||[]),'highlights','video','hosts','agenda','gallery','faqs'])].filter(x=>['highlights','video','hosts','agenda','gallery','faqs'].includes(x));document.getElementById('coverUpload').value='';updateVisibility();draw();window.galleryEditor?.reset();window.videoEditor?.reset()}};
+window.pageEditor={read(){const p={sectionOrder:[...order]};root.querySelectorAll('[data-page]').forEach(el=>p[el.dataset.page]=['countdown','enabled'].includes(el.dataset.page)?el.value==='true':el.value);return p},set(p){root.querySelectorAll('[data-page]').forEach(el=>el.value=p[el.dataset.page]??({palette:'classic',seasonalTheme:'none',coverShape:'arch',coverType:'image',theme:'dark',accent:'#d8b777',countdown:true,enabled:false}[el.dataset.page]??''));updateSeasonalLooks(p.seasonalVariant);order=[...new Set([...(p.sectionOrder||[]),'highlights','video','hosts','agenda','gallery','faqs'])].filter(x=>['highlights','video','hosts','agenda','gallery','faqs'].includes(x));document.getElementById('coverUpload').value='';updateVisibility();draw();window.galleryEditor?.reset();window.videoEditor?.reset()}};
 document.getElementById('coverUpload').onchange=async e=>{const f=e.target.files[0],status=document.getElementById('coverUploadStatus');if(!f)return;if(f.size>1024*1024||!['image/jpeg','image/png','image/webp'].includes(f.type)){status.textContent='Choose a JPG, PNG or WebP smaller than 1 MB.';e.target.value='';return}const reader=new FileReader();reader.onload=()=>{root.querySelector('[data-page="cover"]').value=reader.result;status.textContent='Photo ready. Save the event to publish it.'};reader.readAsDataURL(f)};
 document.getElementById('previewEventPage').onclick=()=>{const f=document.getElementById('eventForm'),e=Object.fromEntries(new FormData(f));e.page=window.pageEditor.read();try{localStorage.setItem('wclEventPreview',JSON.stringify(e));window.open('/event.html?preview=1','_blank','noopener');document.getElementById('previewMessage').textContent='Preview opened. Registration is disabled in previews.'}catch{document.getElementById('previewMessage').textContent='Preview could not open. Your browser may have blocked storage or popups.'}};
 const palettes={classic:['dark','#d8b777'],navy:['dark','#9bd8f5'],cream:['light','#254660'],charcoal:['dark','#d4dce3'],forest:['dark','#e7d5a7'],burgundy:['dark','#f0becb'],terracotta:['light','#963e29']};
