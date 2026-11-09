@@ -26,6 +26,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="events">Events</button>
       <button class="tab" data-tab="archived">Archived Events</button>
+      <button class="tab" data-tab="sponsorships">Sponsorships</button>
       <button class="tab" data-tab="analytics">Analytics</button>
       <button class="tab" data-tab="recruiters">Team Members</button>
       <button class="tab" data-tab="webhooks">Bonzo Campaign Library</button>
@@ -98,6 +99,32 @@
       <section class="card"><div class="section-heading"><div><h2>Campaign & Webhook Library</h2><p>Choose from these saved routes while creating events.</p></div></div><div id="webhooksList" class="events-list"></div></section>
     </section>
 
+    <section id="tab-sponsorships" class="tab-panel" hidden>
+      <section class="card">
+        <h2>Sponsorships</h2>
+        <p>Track sponsor contributions across your events.</p>
+        <form id="sponsorshipForm">
+          <div class="form-grid">
+            <label>Sponsor name<input name="sponsor" maxlength="160" required></label>
+            <label>Contribution (USD)<input name="amount" type="number" min="0.01" max="999999999.99" step="0.01" required></label>
+            <label>Event<select name="eventSlug" required></select></label>
+          </div>
+          <button class="button" type="submit" disabled>Add sponsorship</button>
+          <button class="button secondary" id="cancelSponsorship" type="button" hidden>Cancel edit</button>
+        </form>
+        <p id="sponsorshipMessage" role="status"></p>
+      </section>
+      <section class="card">
+        <h3>Contributions</h3>
+        <label>Filter by event<select id="sponsorshipFilter"><option value="">All events</option></select></label>
+        <p id="sponsorshipTotal" aria-live="polite"></p>
+        <button class="button secondary" type="button" id="refreshSponsorships">Refresh</button>
+        <p id="sponsorshipLoadStatus" role="status"></p>
+        <div class="table-wrap">
+          <table><thead><tr><th scope="col">Sponsor</th><th scope="col">Event</th><th scope="col">Contribution</th><th scope="col">Actions</th></tr></thead><tbody id="sponsorshipRows"></tbody></table>
+        </div>
+      </section>
+    </section>
     <section id="tab-followups" class="tab-panel" hidden><section class="card"><h2>Recruiter follow-up</h2><p>One daily summary per recruiter. Connected Bonzo tracking stops reminders after post-event outreach; reminders can also be stopped manually. Stopping reminders preserves their event and ROI history.</p><div id="notificationSetup"></div><form id="notificationSettings"><div class="form-grid"><label>Notifications<select name="enabled"><option value="false">Off</option><option value="true">On</option></select></label><label>Daily summary hour<select name="hour"><option value="0">00:00</option><option value="1">01:00</option><option value="2">02:00</option><option value="3">03:00</option><option value="4">04:00</option><option value="5">05:00</option><option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option></select></label><label>Time zone<select name="timeZone"><option value="America/New_York">Eastern</option><option value="America/Chicago">Central</option><option value="America/Denver">Mountain</option><option value="America/Phoenix">Arizona</option><option value="America/Los_Angeles">Pacific</option></select></label></div><button class="button">Save notification settings</button></form><p id="notificationMessage" role="status"></p><button id="refreshNotifications" class="button secondary">Refresh</button> <button id="runNotifications" class="button secondary">Retry pending notifications</button><button id="sendRecruiterFollowups" class="button secondary" type="button">Send recruiter follow-ups now</button><p>Emails each active recruiter a fresh table of only their eligible candidates. Recruiter notifications must be On.</p><button id="testNotificationEmail" class="button secondary" type="button" hidden>Send test email to my Gmail</button><p id="notificationStatus" role="status"></p><section class="card"><h3>Your daily outreach report</h3><p>Daily snapshot across events, with candidate details in an attached CSV. This report can run while recruiter reminders are off.</p><form id="dailyReportSettings"><div class="form-grid"><label>Daily report<select name="enabled"><option value="true">On</option><option value="false">Off</option></select></label><label>Send report to<input name="email" type="email" required value="blentz@westcapitallending.com"></label><label>Report hour<select name="hour" id="reportHour"></select></label><label>Time zone<select name="timeZone" id="reportTimeZone"></select></label></div><button class="button">Save report settings</button></form><p id="dailyReportStatus" role="status"></p><button class="button secondary" id="sendDailyReport" type="button">Send fresh report now</button> <button class="button secondary" id="downloadDailyReport" type="button">Download current report CSV</button><p>Each click sends a fresh report to the saved address. The automatic daily report remains separate.</p></section><div id="followupList"></div><h3>Recent delivery attempts</h3><div id="notificationDeliveries"></div></section></section>
     <section id="tab-settings" class="tab-panel" hidden>
       <section class="card"><h2>Monday.com Recruiting Analytics</h2><p>This is read-only. The event platform reads Hires and Candidate Source from your connected Monday board. It also recognizes Orientation and Active Roster when present. Candidates are matched to event registrations by email or phone; source totals show all items in Hires. SELECT SOURCE is shown as Not specified.</p><div id="mondayStatus" class="message">Not checked yet.</div><button id="loadMondayButton" class="button secondary" type="button">Check / Refresh Monday Connection</button><form id="mondayForm" hidden><div class="form-grid"><label>Email Column<select id="mondayEmail" required></select></label><label>Phone Column<select id="mondayPhone" required></select></label><label>Stage Column<select id="mondayStage" required></select></label><label>Production Volume Column<select id="mondayVolume"><option value="">No volume column yet</option></select></label><label class="full">Stages that count as Joined WCL<input id="mondayJoinedStages" value="Confirmed, Orientation" placeholder="Confirmed, Orientation"></label></div><button class="button" type="submit">Save Monday Mapping</button><p class="message" id="mondayMessage"></p></form><h3>Netlify variables required</h3><pre>MONDAY_API_TOKEN
@@ -106,7 +133,8 @@ MONDAY_BOARD_ID</pre><p>The API token stays in Netlify and is never exposed in t
     </section>
   </div>
 </main>
-<script src="/admin.js?v=20261104-settings-verified"></script>
+<script src="/admin.js?v=20261109-sponsorships"></script>
+<script src="/sponsorships-admin.js"></script>
 <script src="/monday-sources.js"></script>
 <script src="/notifications-admin.js?v=20261104-settings-verified"></script>
 <script src="/page-editor.js?v=20261029-gallery"></script>
