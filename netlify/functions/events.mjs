@@ -32,8 +32,9 @@ const eventFields = async (body, existing = null) => {
   if (!validTime(startTime)) throw new Error("Choose a valid start time.");
   if (endTime && !validTime(endTime)) throw new Error("Choose a valid end time.");
   if (endTime && endTime <= startTime) throw new Error("End time must be later than start time.");
-  const recruiterRoutes = await normalizeRoutes(body);
-  if (!recruiterRoutes.length) throw new Error("Select at least one team member and webhook.");
+  const recruiterRoutes = Object.hasOwn(body, "recruiterRoutes")
+    ? await normalizeRoutes(body)
+    : existing?.recruiterRoutes ?? [];
   return {
     page: normalizePage(body.page ?? existing?.page ?? {}),
     name,
@@ -58,7 +59,7 @@ export default async req => {
       const event = await readEvent(requestedSlug);
       if (!event || event.archived) return json({ error: "Event not found." }, 404);
       const { recruiterRoutes, ...publicEvent } = event;
-      return json({ event: publicEvent });
+      return json({ event: { ...publicEvent, requiresRecruiter: Boolean(recruiterRoutes?.length) } });
     }
 
     const auth = requireAdmin(req);

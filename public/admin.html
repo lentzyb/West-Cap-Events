@@ -37,7 +37,7 @@
     <section id="tab-events" class="tab-panel">
       <section class="card" id="eventEditorCard">
         <div class="section-heading">
-          <div><h2 id="eventFormTitle">Create an Event</h2><p id="eventFormHelp">Select each team member and choose that person’s saved Bonzo campaign webhook.</p></div>
+          <div><h2 id="eventFormTitle">Create an Event</h2><p id="eventFormHelp">Leave team members blank for registration-only events, or assign team members and their saved Bonzo campaigns.</p></div>
           <button id="cancelEditButton" class="button secondary" type="button" hidden>Cancel Edit</button>
         </div>
         <form id="eventForm">
@@ -51,8 +51,8 @@
             <label>Time Zone<select name="timeZone"><option value="America/Detroit">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Phoenix">Arizona Time</option><option value="America/Los_Angeles">Pacific Time</option></select></label>
             <label class="full">Location<input name="location" maxlength="180"></label>
             <label class="full">Description<textarea name="description" rows="3" maxlength="1000"></textarea></label>
-            <fieldset class="full"><legend>Team members and Bonzo campaigns</legend><p class="field-help">Choose the team members assigned to this event and the saved Bonzo campaign for each person.</p><button class="button secondary" type="button" id="openTeamPicker">Select Team Members</button><div id="selectedTeamSummary" class="selected-team-summary">No team members selected.</div><div id="eventRecruiters" class="route-grid" hidden></div></fieldset>
-<dialog id="teamPickerDialog" class="team-picker-dialog"><div class="team-picker-head"><div><h3>Select Team Members</h3><p>Choose one or more people and their Bonzo campaign.</p></div><button type="button" class="icon-button" id="closeTeamPicker" aria-label="Close">×</button></div><div id="teamPickerList" class="route-grid"></div><div class="team-picker-actions"><button type="button" class="button secondary" id="cancelTeamPicker">Cancel</button><button type="button" class="button" id="applyTeamPicker">Apply Team Members</button></div></dialog>
+            <fieldset class="full"><legend>Team members and Bonzo campaigns</legend><p class="field-help">Optional. Leave blank to let guests register without choosing a team member.</p><button class="button secondary" type="button" id="openTeamPicker">Select Team Members</button><div id="selectedTeamSummary" class="selected-team-summary">No team members selected.</div><div id="eventRecruiters" class="route-grid" hidden></div></fieldset>
+<dialog id="teamPickerDialog" class="team-picker-dialog"><div class="team-picker-head"><div><h3>Select Team Members</h3><p>Choose team members and their Bonzo campaigns, or clear all selections for registration only.</p></div><button type="button" class="icon-button" id="closeTeamPicker" aria-label="Close">×</button></div><div id="teamPickerList" class="route-grid"></div><div class="team-picker-actions"><button type="button" class="button secondary" id="cancelTeamPicker">Cancel</button><button type="button" class="button" id="applyTeamPicker">Apply Team Members</button></div></dialog>
           </div>
           <div id="pageDesigner"></div>
           <button id="saveEventButton" class="button" type="submit">Create Event</button>
@@ -133,11 +133,11 @@ MONDAY_BOARD_ID</pre><p>The API token stays in Netlify and is never exposed in t
     </section>
   </div>
 </main>
-<script src="/admin.js?v=20261109-sponsorships"></script>
+<script src="/admin.js?v=20261109-registration-only"></script>
 <script src="/sponsorships-admin.js"></script>
 <script src="/monday-sources.js"></script>
 <script src="/notifications-admin.js?v=20261104-settings-verified"></script>
-<script src="/page-editor.js?v=20261029-gallery"></script>
+<script src="/page-editor.js?v=20261109-seasonal"></script>
 <script src="/gallery-editor.js?v=20261029-gallery"></script>
 <script src="/video-editor.js"></script></body>
 </html>

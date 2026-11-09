@@ -17,3 +17,59 @@ html{scroll-behavior:smooth;scroll-padding-top:90px}.event-page{--accent:#d8b777
 .event-hero:not(.video-cover)[data-cover-shape="square"] .hero-photo{height:auto;aspect-ratio:1;object-fit:cover;border-radius:20px}.event-hero:not(.video-cover)[data-cover-shape="full"] .hero-photo{height:auto;max-height:none;object-fit:contain;border-radius:16px}.event-hero:not(.video-cover)[data-cover-shape="circle"] .hero-photo{height:auto;aspect-ratio:1;object-fit:cover;border-radius:50%}
 .event-page[data-palette="navy"]{background:#0d203d;--surface:#172f50;--ink:#f2f8ff;--subtle:#c0d3e6}.event-page[data-palette="cream"]{background:#f7f0e4;--surface:#fffaf2;--ink:#203c52;--subtle:#536775}.event-page[data-palette="charcoal"]{background:#1a1c20;--surface:#282c32;--ink:#f6f7f9;--subtle:#c4c8cf}.event-page[data-palette="forest"]{background:#102e26;--surface:#1a4035;--ink:#fcf7e9;--subtle:#cad8ce}.event-page[data-palette="burgundy"]{background:#321624;--surface:#492334;--ink:#fff4f7;--subtle:#e0c4ce}.event-page[data-palette="terracotta"]{background:#f7e9df;--surface:#fff7ef;--ink:#532d22;--subtle:#7b594d}.event-hero.video-cover{--ink:#fff;--subtle:#e8edef}.event-page .button:not(.secondary){color:var(--button-ink,#10202a)}
 @media(max-width:600px){.event-hero.video-cover{margin:12px 12px 24px;padding:40px 22px 70px;min-height:500px}.video-cover::after{background:rgba(4,13,20,.72)}}
+
+#recruiterField[hidden] { display: none; }
+
+/* Seasonal backgrounds sit behind the event content and uploaded covers. */
+.event-page[data-seasonal-theme="christmas"] {
+  --surface: #19382d;
+  --ink: #fff8e9;
+  --subtle: #dbe8df;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23e5c17c%22%20opacity%3D%22.23%22%3E%3Cpath%20d%3D%22M41%200v30m0%200h-5v6h10v-6z%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2252%22%20r%3D%2216%22%2F%3E%3Cpath%20d%3D%22M27%2050q14%2010%2028%200M150%2098v22%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22132%22%20r%3D%2212%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23e08e8e%22%20opacity%3D%22.18%22%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%2252%22%20r%3D%2215%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22132%22%20r%3D%2211%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M94%20129l12-21%2012%2021h-6l11%2018H89l11-18z%22%20fill%3D%22%239fceb0%22%20opacity%3D%22.19%22%2F%3E%3C%2Fsvg%3E") repeat,
+              radial-gradient(ellipse at top right, #34191f, transparent 75%), #102d24;
+}
+.event-page[data-seasonal-theme="winter"] {
+  --surface: #1b3149;
+  --ink: #f4f9ff;
+  --subtle: #d1e1ee;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23d6eeff%22%20stroke-width%3D%221.3%22%20opacity%3D%22.24%22%3E%3Cpath%20d%3D%22M40%2018v36m-16-27%2032%2018m0-18L24%2045m112%2065v26m-11-19%2022%2013m0-13-22%2013%22%2F%3E%3Cpath%20d%3D%22m36%2023%204%205%204-5m-8%2026%204-5%204%205%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23fff%22%20opacity%3D%22.28%22%3E%3Ccircle%20cx%3D%2292%22%20cy%3D%2257%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%22170%22%20cy%3D%2225%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%2267%22%20cy%3D%22128%22%20r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat,
+              radial-gradient(ellipse at top right, #254761, transparent 75%), #101f37;
+}
+.event-page[data-seasonal-theme="spring"] {
+  --surface: #fffaf8;
+  --ink: #253c31;
+  --subtle: #425c4f;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22%23c56d94%22%20opacity%3D%22.16%22%3E%3Ccircle%20cx%3D%2234%22%20cy%3D%2231%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2239%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2251%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2227%22%20cy%3D%2250%22%20r%3D%228%22%2F%3E%3Ccircle%20cx%3D%2224%22%20cy%3D%2238%22%20r%3D%228%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2234%22%20cy%3D%2241%22%20r%3D%224%22%20fill%3D%22%23d6a24e%22%20opacity%3D%22.35%22%2F%3E%3Cpath%20d%3D%22M130%20112q36-14%2032-35-23%201-32%2035m-4%207q-27-3-30-25%2024-2%2030%2025%22%20fill%3D%22%23569775%22%20opacity%3D%22.18%22%2F%3E%3C%2Fsvg%3E") repeat,
+              radial-gradient(ellipse at top right, #fae8ef, transparent 75%), #e9f4e8;
+}
+.event-page[data-seasonal-theme="summer"] {
+  --surface: #faffff;
+  --ink: #153c47;
+  --subtle: #3d6068;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20stroke%3D%22%23bc792b%22%20fill%3D%22none%22%20opacity%3D%22.22%22%3E%3Ccircle%20cx%3D%2245%22%20cy%3D%2240%22%20r%3D%2213%22%2F%3E%3Cpath%20d%3D%22M45%2020v-6m0%2046v6M25%2040h-6m46%200h6m-40-14-5-5m33%2033%205%205m-33-5-5%205m33-33%205-5%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M101%20108q11-10%2022%200t22%200%2022%200m-66%2010q11-10%2022%200t22%200%2022%200%22%20fill%3D%22none%22%20stroke%3D%22%23298e9b%22%20opacity%3D%22.20%22%2F%3E%3C%2Fsvg%3E") repeat,
+              radial-gradient(ellipse at top right, #d9f4f1, transparent 75%), #fff1d0;
+}
+.event-page[data-seasonal-theme="fall"] {
+  --surface: #fff8ee;
+  --ink: #502e23;
+  --subtle: #684637;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22%23a6512d%22%20opacity%3D%22.19%22%3E%3Cpath%20d%3D%22M35%2060q1-31%2035-41-1%2033-35%2041m0%200-7%207%22%2F%3E%3Cpath%20d%3D%22M134%20108q17-25%2042-16-11%2029-42%2016%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M70%20119q-30-6-29-31%2029%201%2029%2031%22%20fill%3D%22%23c98731%22%20opacity%3D%22.25%22%2F%3E%3C%2Fsvg%3E") repeat,
+              radial-gradient(ellipse at top right, #f4ede0, transparent 75%), #f9dfc6;
+}
+.event-page[data-seasonal-theme="halloween"] {
+  --surface: #30233c;
+  --ink: #fff4e9;
+  --subtle: #e4d4e8;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20fill%3D%22%23f39c50%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M47%2042c-22-13-30%2026%200%2028%2030-2%2022-41%200-28z%22%2F%3E%3Cpath%20d%3D%22M44%2042l3-10%205%202-4%209z%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M118%20108q14-8%2024%204l4-8%204%208q10-12%2024-4-12%203-14%2013-7-4-14%204-7-8-14-4-2-10-14-13%22%20fill%3D%22%23d6acee%22%20opacity%3D%22.23%22%2F%3E%3C%2Fsvg%3E") repeat,
+              radial-gradient(ellipse at top right, #422319, transparent 75%), #24182f;
+}
+.event-page[data-seasonal-theme="new-year"] {
+  --surface: #232744;
+  --ink: #fff8e9;
+  --subtle: #e1d8ef;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22190%22%20height%3D%22160%22%3E%3Cg%20stroke%3D%22%23f4cd7f%22%20fill%3D%22none%22%20opacity%3D%22.32%22%3E%3Cpath%20d%3D%22M43%2017v38m-19-19h38m-32-13%2026%2026m-26%200%2026-26m95%2075v28m-14-14h28%22%2F%3E%3Cpath%20d%3D%22m93%2080%203-8%203%208%208%203-8%203-3%208-3-8-8-3z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23f4cd7f%22%20opacity%3D%22.22%22%3E%3Ccircle%20cx%3D%22117%22%20cy%3D%2236%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%22131%22%20r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat,
+              radial-gradient(ellipse at top right, #34274b, transparent 75%), #14172c;
+}
+.event-page:is([data-seasonal-theme="spring"], [data-seasonal-theme="summer"], [data-seasonal-theme="fall"]) .eyebrow {
+  color: var(--ink);
+}
