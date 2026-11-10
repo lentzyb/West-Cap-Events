@@ -1,7 +1,7 @@
 (()=>{
 const root=document.getElementById('pageDesigner');
 root.innerHTML=`<fieldset style="margin:24px 0"><legend>Design your event page</legend><label style="margin:14px 0">Build an event website<select data-page="enabled"><option value="false">Off — simple registration page</option><option value="true">On — full event website</option></select></label><div id="websiteOptions"><p>Leave optional sections empty to hide them. Save changes to update your existing link and QR code.</p><div class="form-grid">
-<label>Small heading<input data-page="eyebrow" placeholder="YOU’RE INVITED" maxlength="80"></label><label>Registration button<input data-page="buttonText" placeholder="Save My Spot" maxlength="40"></label>
+<label>Heading above event title (optional)<input data-page="eyebrow" placeholder="Leave blank to hide" maxlength="80"></label><label>Registration button<input data-page="buttonText" placeholder="Save My Spot" maxlength="40"></label>
 <label class="full">Headline override<input data-page="headline" placeholder="Leave blank to use the event name" maxlength="160"></label>
 <label>Seasonal theme<select data-page="seasonalTheme">
 <option value="none">None — use your color palette</option>
