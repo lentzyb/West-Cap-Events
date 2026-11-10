@@ -85,3 +85,6 @@ html{scroll-behavior:smooth;scroll-padding-top:90px}.event-page{--accent:#d8b777
     background-position: center top, center top;
   }
 }
+
+/* Keep guest labels readable on every event theme. */
+.event-page #plusOneField legend { color: var(--ink); }
