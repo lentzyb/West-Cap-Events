@@ -16,7 +16,13 @@ export default async req => {
       const body = await parseJSON(req);
       if (!body) return json({ error: "Invalid JSON." }, 400);
 
-      const routes = event.recruiterRoutes ?? [];
+      const internal = event.questionnaire === "internal";
+      const routes = internal ? [] : (event.recruiterRoutes ?? []);
+      const plusOneFirstName = internal ? clean(body.plusOneFirstName, 80) : "";
+      const plusOneLastName = internal ? clean(body.plusOneLastName, 80) : "";
+      if (Boolean(plusOneFirstName) !== Boolean(plusOneLastName)) {
+        return json({ error: "Enter both names for your plus-one, or leave both blank." }, 400);
+      }
       const recruiter = routes.length ? await readRecruiter(body.recruiterId) : null;
       const route = routes.find(item => item.recruiterId === recruiter?.id);
       if (routes.length && (!recruiter?.active || !route?.webhookUrl)) {
@@ -34,7 +40,8 @@ export default async req => {
         eventName: event.name,
         firstName: clean(body.firstName, 80),
         lastName: clean(body.lastName, 80),
-        nmlsId: clean(body.nmlsId, 40),
+        nmlsId: internal ? "" : clean(body.nmlsId, 40),
+        ...(plusOneFirstName ? { plusOneFirstName, plusOneLastName } : {}),
         phone: clean(body.phone, 40),
         email: clean(body.email, 150).toLowerCase(),
         recruiterId: recruiter?.id ?? "",
@@ -44,7 +51,7 @@ export default async req => {
         calendly: { shownAt: null, eventTypeViewedAt: null, timeSelectedAt: null, scheduledAt: null }
       };
 
-      if (!registration.firstName || !registration.lastName || !registration.nmlsId || !registration.phone || !registration.email) {
+      if (!registration.firstName || !registration.lastName || !registration.email || (!internal && (!registration.nmlsId || !registration.phone))) {
         return json({ error: "All registration fields are required." }, 400);
       }
 

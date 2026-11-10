@@ -45,6 +45,7 @@ const eventFields = async (body, existing = null) => {
     timeZone: clean(body.timeZone ?? existing?.timeZone ?? "America/Detroit", 80),
     location: clean(body.location ?? existing?.location, 180),
     description: clean(body.description ?? existing?.description, 1000),
+    questionnaire: (body.questionnaire ?? existing?.questionnaire) === "internal" ? "internal" : "external",
     recruiterIds: recruiterRoutes.map(route => route.recruiterId),
     recruiterRoutes
   };
@@ -59,7 +60,7 @@ export default async req => {
       const event = await readEvent(requestedSlug);
       if (!event || event.archived) return json({ error: "Event not found." }, 404);
       const { recruiterRoutes, ...publicEvent } = event;
-      return json({ event: { ...publicEvent, requiresRecruiter: Boolean(recruiterRoutes?.length) } });
+      return json({ event: { ...publicEvent, requiresRecruiter: event.questionnaire !== "internal" && Boolean(recruiterRoutes?.length) } });
     }
 
     const auth = requireAdmin(req);

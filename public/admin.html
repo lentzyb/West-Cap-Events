@@ -49,6 +49,13 @@
             <label>Start Time<input name="startTime" type="time" required></label>
             <label>End Time <span class="optional">Optional</span><input name="endTime" type="time"></label>
             <label>Time Zone<select name="timeZone"><option value="America/Detroit">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Phoenix">Arizona Time</option><option value="America/Los_Angeles">Pacific Time</option></select></label>
+            <label class="full">Registration questionnaire
+              <select name="questionnaire">
+                <option value="external">External registration</option>
+                <option value="internal">Internal RSVP with optional plus-one</option>
+              </select>
+              <span class="field-help">Internal RSVP asks for name and email, plus an optional guest name. Recruiter selection and Bonzo routing apply to External registration.</span>
+            </label>
             <label class="full">Location<input name="location" maxlength="180"></label>
             <label class="full">Description<textarea name="description" rows="3" maxlength="1000"></textarea></label>
             <fieldset class="full"><legend>Team members and Bonzo campaigns</legend><p class="field-help">Optional. Leave blank to let guests register without choosing a team member.</p><button class="button secondary" type="button" id="openTeamPicker">Select Team Members</button><div id="selectedTeamSummary" class="selected-team-summary">No team members selected.</div><div id="eventRecruiters" class="route-grid" hidden></div></fieldset>
@@ -133,7 +140,7 @@ MONDAY_BOARD_ID</pre><p>The API token stays in Netlify and is never exposed in t
     </section>
   </div>
 </main>
-<script src="/admin.js?v=20261109-registration-only"></script>
+<script src="/admin.js?v=20261110-plus-one"></script>
 <script src="/sponsorships-admin.js"></script>
 <script src="/monday-sources.js"></script>
 <script src="/notifications-admin.js?v=20261104-settings-verified"></script>

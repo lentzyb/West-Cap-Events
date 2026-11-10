@@ -18,9 +18,14 @@ export default async req => {
     registrations.sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
 
     const headers = ["First Name", "Last Name", "NMLS ID", "Phone", "Email", "Referred By", "Webhook Sync", "Webhook Error", "Registered At"];
+    const includePlusOne = event.questionnaire === "internal" ||
+      registrations.some(item => item.plusOneFirstName || item.plusOneLastName);
+    if (includePlusOne) headers.push("Plus-one First Name", "Plus-one Last Name");
     const rows = registrations.map(item => {
       const sync = item.webhookSync || item.bonzoSync || {};
-      return [item.firstName, item.lastName, item.nmlsId, item.phone, item.email, item.referredBy, sync.status || "", sync.error || "", item.createdAt];
+      const row = [item.firstName, item.lastName, item.nmlsId, item.phone, item.email, item.referredBy, sync.status || "", sync.error || "", item.createdAt];
+      if (includePlusOne) row.push(item.plusOneFirstName, item.plusOneLastName);
+      return row;
     });
 
     const csv = [headers.map(csvCell).join(","), ...rows.map(row => row.map(csvCell).join(","))].join("\r\n");
