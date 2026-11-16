@@ -9,10 +9,13 @@
   const loadStatus = $("sponsorshipLoadStatus");
   const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
   const statuses = { confirmed: "Confirmed", waiting: "Waiting to hear back", declined: "Declined" };
-  function syncAmountRequirement() {
-    form.elements.amount.required = form.elements.status.value === "confirmed";
+  function syncStatusFields() {
+    const confirmed = form.elements.status.value === "confirmed";
+    form.elements.amount.required = confirmed;
+    form.elements.invoiceStatus.disabled = !confirmed;
+    $("sponsorshipInvoiceField").style.display = confirmed ? "" : "none";
   }
-  form.elements.status.addEventListener("change", syncAmountRequirement);
+  form.elements.status.addEventListener("change", syncStatusFields);
 
   let events = [];
   let entries = [];
@@ -24,6 +27,8 @@
     return [event.name, event.date, event.archived ? "Archived" : ""].filter(Boolean).join(" · ");
   }
 
+  const invoiceLabels = { not_sent: "Not sent", sent: "Invoice sent", paid: "Paid" };
+
   function render() {
     const labels = new Map(events.map(event => [event.slug, eventLabel(event)]));
     const visible = entries.filter(entry => !filter.value || entry.eventSlug === filter.value);
@@ -32,7 +37,10 @@
     $("sponsorshipTotal").textContent = `${usd.format(cents / 100)} confirmed · ${visible.length} sponsorship${visible.length === 1 ? "" : "s"}`;
     const rows = visible.map(entry => {
       const row = document.createElement("tr");
-      for (const text of [entry.sponsor, labels.get(entry.eventSlug) ?? entry.eventName, statuses[entry.status ?? "confirmed"], entry.amountCents == null ? "—" : usd.format(entry.amountCents / 100)]) {
+      const status = entry.status ?? "confirmed";
+      const invoice = status === "confirmed" ? invoiceLabels[entry.invoiceStatus ?? "not_sent"] : "—";
+      const amount = entry.amountCents == null ? "—" : usd.format(entry.amountCents / 100);
+      for (const text of [entry.sponsor, labels.get(entry.eventSlug) ?? entry.eventName, statuses[status], invoice, amount]) {
         row.insertCell().textContent = text;
       }
       const edit = document.createElement("button");
@@ -46,7 +54,8 @@
         form.elements.sponsor.value = entry.sponsor;
         form.elements.amount.value = entry.amountCents == null ? "" : (entry.amountCents / 100).toFixed(2);
         form.elements.status.value = entry.status ?? "confirmed";
-        syncAmountRequirement();
+        form.elements.invoiceStatus.value = entry.invoiceStatus ?? "not_sent";
+        syncStatusFields();
         form.elements.eventSlug.value = entry.eventSlug;
         save.textContent = "Save changes";
         cancel.hidden = false;
@@ -95,7 +104,7 @@
   function resetEditor() {
     editing = null;
     form.reset();
-    syncAmountRequirement();
+    syncStatusFields();
     save.textContent = "Add sponsorship";
     cancel.hidden = true;
   }
@@ -128,6 +137,7 @@
     } finally {
       saving = false;
       for (const control of form.elements) control.disabled = false;
+      syncStatusFields();
     }
   };
 })();

@@ -40,10 +40,15 @@ export default async function sponsorships(req) {
     if ((amount || status === "confirmed") && (!/^\d{1,9}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0)) {
       return json({ error: "Enter a positive dollar amount with up to two decimal places." }, 400);
     }
+    const invoiceStatus = body.invoiceStatus ?? previous?.data.invoiceStatus ?? "not_sent";
+    if (!["not_sent", "sent", "paid"].includes(invoiceStatus)) {
+      return json({ error: "Choose a valid invoice status." }, 400);
+    }
     const now = new Date().toISOString();
     const entry = {
       id, sponsor, eventSlug: event.slug, eventName: event.name,
       status,
+      invoiceStatus,
       amountCents: amount ? Math.round(Number(amount) * 100) : null,
       revision: crypto.randomUUID(),
       createdAt: previous?.data.createdAt ?? now,
