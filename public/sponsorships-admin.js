@@ -8,6 +8,12 @@
   const message = $("sponsorshipMessage");
   const loadStatus = $("sponsorshipLoadStatus");
   const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+  const statuses = { confirmed: "Confirmed", waiting: "Waiting to hear back", declined: "Declined" };
+  function syncAmountRequirement() {
+    form.elements.amount.required = form.elements.status.value === "confirmed";
+  }
+  form.elements.status.addEventListener("change", syncAmountRequirement);
+
   let events = [];
   let entries = [];
   let editing = null;
@@ -21,11 +27,12 @@
   function render() {
     const labels = new Map(events.map(event => [event.slug, eventLabel(event)]));
     const visible = entries.filter(entry => !filter.value || entry.eventSlug === filter.value);
-    const cents = visible.reduce((total, entry) => total + entry.amountCents, 0);
-    $("sponsorshipTotal").textContent = `${usd.format(cents / 100)} total · ${visible.length} contribution${visible.length === 1 ? "" : "s"}`;
+    const confirmed = visible.filter(entry => (entry.status ?? "confirmed") === "confirmed");
+    const cents = confirmed.reduce((total, entry) => total + entry.amountCents, 0);
+    $("sponsorshipTotal").textContent = `${usd.format(cents / 100)} confirmed · ${visible.length} sponsorship${visible.length === 1 ? "" : "s"}`;
     const rows = visible.map(entry => {
       const row = document.createElement("tr");
-      for (const text of [entry.sponsor, labels.get(entry.eventSlug) ?? entry.eventName, usd.format(entry.amountCents / 100)]) {
+      for (const text of [entry.sponsor, labels.get(entry.eventSlug) ?? entry.eventName, statuses[entry.status ?? "confirmed"], entry.amountCents == null ? "—" : usd.format(entry.amountCents / 100)]) {
         row.insertCell().textContent = text;
       }
       const edit = document.createElement("button");
@@ -37,7 +44,9 @@
         if (saving) return;
         editing = entry;
         form.elements.sponsor.value = entry.sponsor;
-        form.elements.amount.value = (entry.amountCents / 100).toFixed(2);
+        form.elements.amount.value = entry.amountCents == null ? "" : (entry.amountCents / 100).toFixed(2);
+        form.elements.status.value = entry.status ?? "confirmed";
+        syncAmountRequirement();
         form.elements.eventSlug.value = entry.eventSlug;
         save.textContent = "Save changes";
         cancel.hidden = false;
@@ -86,6 +95,7 @@
   function resetEditor() {
     editing = null;
     form.reset();
+    syncAmountRequirement();
     save.textContent = "Add sponsorship";
     cancel.hidden = true;
   }

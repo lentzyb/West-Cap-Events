@@ -20,9 +20,6 @@ export default async function sponsorships(req) {
     const sponsor = clean(body.sponsor, 160);
     const amount = String(body.amount ?? "").trim();
     if (!sponsor) return json({ error: "Enter a sponsor name." }, 400);
-    if (!/^\d{1,9}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
-      return json({ error: "Enter a positive dollar amount with up to two decimal places." }, 400);
-    }
     const db = store();
     const event = await db.get(eventKey(clean(body.eventSlug, 100)), { type: "json" });
     if (!event) return json({ error: "Choose an existing event." }, 400);
@@ -36,10 +33,18 @@ export default async function sponsorships(req) {
     if (previous && previous.data.revision !== body.revision) {
       return json({ error: "Someone updated this sponsorship. Refresh and reopen it before editing." }, 409);
     }
+    const status = body.status ?? previous?.data.status ?? "confirmed";
+    if (!["confirmed", "waiting", "declined"].includes(status)) {
+      return json({ error: "Choose a valid sponsorship status." }, 400);
+    }
+    if ((amount || status === "confirmed") && (!/^\d{1,9}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0)) {
+      return json({ error: "Enter a positive dollar amount with up to two decimal places." }, 400);
+    }
     const now = new Date().toISOString();
     const entry = {
       id, sponsor, eventSlug: event.slug, eventName: event.name,
-      amountCents: Math.round(Number(amount) * 100),
+      status,
+      amountCents: amount ? Math.round(Number(amount) * 100) : null,
       revision: crypto.randomUUID(),
       createdAt: previous?.data.createdAt ?? now,
       updatedAt: now
