@@ -10,14 +10,17 @@ const buckets=['Needs outreach','Contacted','Stopped','Waiting / setup needed','
 function category(row,event){if(row.status==='Stopped')return 'Stopped';if(['Event archived','Removed from imported list','Recruiter inactive'].includes(row.status))return 'Inactive';if(row.contactedAt)return 'Contacted';if(eventEnd(event)===null||eventEnd(event)>Date.now())return 'Waiting / setup needed';return bonzoEnabled()?'Needs outreach':'Unverified'}
 export async function reportSnapshot(){
  const [tracked,events,recruiters,registrations,attendees,messages,bonzo]=await Promise.all([notificationRows(),listAll('event:'),listAll('recruiter:'),listAll('registration:'),listAll('attendee:'),bonzoMessages(),bonzoStatus()]);
- const rows=[...tracked];const eventMap=new Map(events.map(e=>[e.slug,e]));
+ const reportEvents = events.filter(event => !event.archived && event.questionnaire !== 'internal');
+ const eventMap = new Map(reportEvents.map(event => [event.slug, event]));
+ const rows = tracked.filter(row => eventMap.has(row.eventSlug));
  // Include unassigned and missing-contact audience too, with registrations taking precedence over imports.
  for(const source of [...registrations,...attendees]){
+  if (!eventMap.has(source.eventSlug)) continue;
   if(rows.some(r=>r.eventSlug===source.eventSlug&&(r.sourceId===source.id||sameContact(r,source))))continue;
   const event=eventMap.get(source.eventSlug),recruiter=recruiters.find(r=>r.id===source.recruiterId),outreach=outreachState(source,event,messages);
   rows.push({...source,recruiterName:recruiter?.name||'Unassigned',recruiterEmail:recruiter?.email||'',eventName:event?.name||source.eventName||source.eventSlug,status:source.importRemoved?'Removed from imported list':!event||event.archived?'Event archived':recruiter&&!recruiter.active?'Recruiter inactive':outreach.status,contactedAt:outreach.contactedAt||'',contactType:outreach.contactType||'',campaign:outreach.campaign||false});
  }
- const result=rows.filter(r=>eventMap.has(r.eventSlug)&&!eventMap.get(r.eventSlug).archived).map(r=>({...r,category:category(r,eventMap.get(r.eventSlug))})).sort((a,b)=>String(a.eventName||'').localeCompare(b.eventName||'')||String(a.recruiterName||'').localeCompare(b.recruiterName||'')||String(a.lastName||'').localeCompare(b.lastName||''));
+ const result=rows.map(r=>({...r,category:category(r,eventMap.get(r.eventSlug))})).sort((a,b)=>String(a.eventName||'').localeCompare(b.eventName||'')||String(a.recruiterName||'').localeCompare(b.recruiterName||'')||String(a.lastName||'').localeCompare(b.lastName||''));
  return {at:new Date().toISOString(),bonzo,rows:result,counts:Object.fromEntries(buckets.map(k=>[k,result.filter(r=>r.category===k).length]))};
 }
 function csvCell(value){let s=String(value??'');if(/^[\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"'}
