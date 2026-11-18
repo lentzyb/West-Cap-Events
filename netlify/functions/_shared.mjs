@@ -78,9 +78,11 @@ export const listAll = async prefix => {
   const s = store(); const values = []; let cursor;
   do {
     const page = await s.list(cursor ? { prefix, cursor } : { prefix });
-    for (const blob of page.blobs || []) {
-      const value = await s.get(blob.key, { type: "json" });
-      if (value) values.push(value);
+    const blobs = page.blobs || [];
+    // Bound concurrent reads so larger imports do not require one network round trip per row.
+    for (let offset = 0; offset < blobs.length; offset += 8) {
+      const batch = await Promise.all(blobs.slice(offset, offset + 8).map(blob => s.get(blob.key, { type: "json" })));
+      values.push(...batch.filter(Boolean));
     }
     cursor = page.cursor;
   } while (cursor);
