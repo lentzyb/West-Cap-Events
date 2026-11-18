@@ -10,8 +10,21 @@ export default async function sponsorships(req) {
       const [events, entries] = await Promise.all([listAll("event:"), listAll("sponsorship:")]);
       return json({
         events: events.map(({ slug, name, date, archived }) => ({ slug, name, date, archived })),
-        entries: entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        entries: entries.filter(entry => !entry.deleted).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       });
+    }
+    if (req.method === "DELETE") {
+      const body = await parseJSON(req);
+      const id = String(body?.id || "");
+      if (!/^[a-f0-9-]{36}$/.test(id)) return json({ error: "Invalid sponsorship ID." }, 400);
+      const db = store(), key = "sponsorship:" + id;
+      const previous = await db.getWithMetadata(key, { type: "json" });
+      if (!previous || previous.data.deleted) return json({ ok: true });
+      if (previous.data.revision !== body.revision) return json({ error: "This sponsorship changed. Refresh before deleting." }, 409);
+      // A conditional tombstone prevents a concurrent edit from restoring a deleted entry.
+      const result = await db.setJSON(key, { id, deleted: true, revision: crypto.randomUUID(), deletedAt: new Date().toISOString() }, { onlyIfMatch: previous.etag });
+      if (!result.modified) return json({ error: "This sponsorship changed. Refresh before deleting." }, 409);
+      return json({ ok: true });
     }
     if (!["POST", "PATCH"].includes(req.method)) return json({ error: "Method not allowed." }, 405);
 
@@ -29,7 +42,7 @@ export default async function sponsorships(req) {
     if (updating && !/^[a-f0-9-]{36}$/.test(id)) return json({ error: "Invalid sponsorship ID." }, 400);
     const key = "sponsorship:" + id;
     const previous = updating ? await db.getWithMetadata(key, { type: "json" }) : null;
-    if (updating && !previous) return json({ error: "Sponsorship not found." }, 404);
+    if (updating && (!previous || previous.data.deleted)) return json({ error: "Sponsorship not found." }, 404);
     if (previous && previous.data.revision !== body.revision) {
       return json({ error: "Someone updated this sponsorship. Refresh and reopen it before editing." }, 409);
     }

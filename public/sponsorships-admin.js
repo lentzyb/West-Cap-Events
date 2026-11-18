@@ -62,7 +62,35 @@
         message.textContent = "";
         form.elements.sponsor.focus();
       };
-      row.insertCell().append(edit);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button danger";
+      remove.textContent = "Delete";
+      remove.setAttribute("aria-label", "Delete sponsorship for " + entry.sponsor);
+      remove.onclick = async () => {
+        if (loading || saving) return;
+        if (!confirm(`Delete ${entry.sponsor}'s sponsorship for ${entry.eventName}? It will be removed from the tracker and totals.`)) return;
+        saving = true;
+        for (const control of form.elements) control.disabled = true;
+        remove.disabled = true;
+        message.textContent = "Deleting sponsorship…";
+        try {
+          await api(endpoint, { method: "DELETE", body: JSON.stringify({ id: entry.id, revision: entry.revision }) });
+          entries = entries.filter(item => item.id !== entry.id);
+          if (editing?.id === entry.id) resetEditor();
+          render();
+          message.textContent = "Sponsorship deleted.";
+        } catch (error) {
+          message.textContent = error.message;
+        } finally {
+          saving = false;
+          remove.disabled = false;
+          for (const control of form.elements) control.disabled = false;
+          save.disabled = !events.length;
+          syncStatusFields();
+        }
+      };
+      row.insertCell().append(edit, remove);
       return row;
     });
     $("sponsorshipRows").replaceChildren(...rows);
