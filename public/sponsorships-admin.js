@@ -141,6 +141,11 @@
     resetEditor();
     message.textContent = "";
   };
+  $("sponsorSummary").onclick = async () => {
+    if (saving || loading) return;
+    try { await window.openSponsorSummary(filter.value); }
+    catch (error) { message.textContent = error.message; }
+  };
   refresh.onclick = window.loadSponsorships;
   filter.onchange = render;
 
