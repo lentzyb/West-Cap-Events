@@ -15,11 +15,14 @@
       committed: sum(confirmed), paid: sum(paid), sent: sum(sent), unbilled: sum(unbilled), pipeline: sum(waiting)
     };
   }
+  function orderedSponsors(rows) {
+    const rank = { confirmed: 0, waiting: 1, declined: 2 };
+    return [...rows].sort((a, b) => (rank[a.status ?? 'confirmed'] - rank[b.status ?? 'confirmed']) || ((b.amountCents || 0) - (a.amountCents || 0)) || a.sponsor.localeCompare(b.sponsor));
+  }
   function render(data, now = new Date()) {
     const statuses = { confirmed: 'Confirmed', waiting: 'Waiting to hear back', declined: 'Declined' };
     const invoices = { paid: 'Paid', sent: 'Invoice sent', not_sent: 'Not sent' };
-    const rank = { confirmed: 0, waiting: 1, declined: 2 };
-    const sorted = [...data.rows].sort((a, b) => (rank[a.status ?? 'confirmed'] - rank[b.status ?? 'confirmed']) || ((b.amountCents || 0) - (a.amountCents || 0)) || a.sponsor.localeCompare(b.sponsor));
+    const sorted = orderedSponsors(data.rows);
     const shown = sorted.slice(0, 24);
     const dollars = cents => money.format(cents / 100);
     const date = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/New_York' }).format(now);
@@ -41,12 +44,12 @@
   function emailHTML(data, now = new Date()) {
     const dollars = cents => money.format(cents / 100);
     const date = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/New_York' }).format(now);
-    const cell = 'padding:10px 12px;border-bottom:1px solid #dce4e9;text-align:left;vertical-align:top;';
+    const cell = 'padding:8px;border:1px solid #dce4e9;text-align:left;vertical-align:top;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:16px;color:#19354e;word-wrap:break-word;';
     const heading = cell + 'background-color:#19354e;color:#ffffff;font-weight:bold;';
     const statuses = { confirmed: 'Confirmed', waiting: 'Waiting to hear back', declined: 'Declined' };
     const invoices = { paid: 'Paid', sent: 'Invoice sent', not_sent: 'Not sent' };
-    const rows = [...data.rows].sort((a, b) => a.sponsor.localeCompare(b.sponsor));
-    return `<div style="font-family:Arial,Helvetica,sans-serif;color:#19354e;font-size:13px;line-height:1.4;max-width:720px;">
+    const rows = orderedSponsors(data.rows);
+    return `<table role="presentation" width="720" cellpadding="0" cellspacing="0" border="0" style="width:720px;border-collapse:collapse;table-layout:fixed;font-family:Arial,Helvetica,sans-serif;color:#19354e;font-size:13px;line-height:18px;"><tr><td style="padding:20px;background-color:#ffffff;">
       <p style="font-size:11px;letter-spacing:2px;font-weight:bold;">WEST CAPITAL LENDING</p>
       <h1 style="font-size:26px;margin:8px 0;">Sponsorship summary</h1>
       <h2 style="font-size:18px;margin:4px 0;">${escape(data.title)}</h2>
@@ -57,15 +60,15 @@
       <p><b>${dollars(data.sent)}</b> invoiced, awaiting payment &nbsp; | &nbsp; <b>${dollars(data.unbilled)}</b> still to invoice</p>
       <p><b>${data.confirmed} confirmed</b> &nbsp; | &nbsp; ${data.waiting} waiting to hear back (${dollars(data.pipeline)} potential) &nbsp; | &nbsp; ${data.declined} declined</p>
       <h3 style="font-size:15px;border-top:2px solid #c4a66a;padding-top:14px;">Sponsor commitments &amp; next steps</h3>
-      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:12px;table-layout:fixed;"><thead><tr>${['Sponsor', 'Event', 'Contribution', 'Status / next step'].map(label => `<th style="${heading}">${label}</th>`).join('')}</tr></thead><tbody>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width:680px;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:12px;table-layout:fixed;mso-table-lspace:0pt;mso-table-rspace:0pt;"><thead><tr>${[['Sponsor', 170], ['Event', 150], ['Contribution', 130], ['Status / next step', 230]].map(([label, width]) => `<th width="${width}" bgcolor="#19354e" style="${heading}width:${width}px;">${label}</th>`).join('')}</tr></thead><tbody>
       ${rows.map(entry => {
         const status = entry.status ?? 'confirmed', invoice = entry.invoiceStatus ?? 'not_sent';
         const next = status === 'confirmed' ? invoice === 'paid' ? 'Paid' : invoice === 'sent' ? 'Follow up on payment' : 'Send invoice' : status === 'waiting' ? 'Awaiting response' : 'Declined';
-        return `<tr><td style="${cell}"><b>${escape(entry.sponsor)}</b></td><td style="${cell}">${escape(entry.eventName)}</td><td style="${cell}">${entry.amountCents == null ? 'TBD' : dollars(entry.amountCents)}${status === 'waiting' && entry.amountCents != null ? ' potential' : ''}</td><td style="${cell}">${escape(statuses[status] || status)}${status === 'confirmed' ? ' · ' + escape(invoices[invoice] || invoice) : ''}<br><span style="font-size:11px;color:#667786;">${escape(next)}</span></td></tr>`;
+        return `<tr><td width="170" style="${cell}width:170px;"><b>${escape(entry.sponsor)}</b></td><td width="150" style="${cell}width:150px;">${escape(entry.eventName)}</td><td width="130" style="${cell}width:130px;">${entry.amountCents == null ? 'TBD' : dollars(entry.amountCents)}${status === 'waiting' && entry.amountCents != null ? ' potential' : ''}</td><td width="230" style="${cell}width:230px;">${escape(statuses[status] || status)}${status === 'confirmed' ? ' · ' + escape(invoices[invoice] || invoice) : ''}<br><span style="font-size:11px;color:#667786;">${escape(next)}</span></td></tr>`;
       }).join('') || `<tr><td colspan="4" style="${cell}">No sponsorships for this selection.</td></tr>`}
       </tbody></table>
       <p style="font-size:10px;color:#667786;">Outstanding includes confirmed commitments only. Potential contributions are excluded from confirmed totals. Payment and invoice statuses reflect your saved tracker entries.</p>
-      </div>`;
+      </td></tr></table>`;
   }
 
   async function copyForEmail(preview, html) {
