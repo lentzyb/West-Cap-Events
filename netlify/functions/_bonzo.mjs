@@ -11,6 +11,41 @@ export function eventEnd(event){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(event?.date||'')||!/^\d{2}:\d{2}$/.test(event?.endTime||''))return null;
  try{const desired=event.date+'T'+event.endTime;const base=Date.parse(desired+':00Z');const zone=event.timeZone||'America/Detroit';const f=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});const local=t=>{const p=Object.fromEntries(f.formatToParts(new Date(t)).map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`};const offsets=new Set([-86400000,0,86400000].map(delta=>Date.parse(local(base+delta)+':00Z')-(base+delta)));const matches=[...offsets].map(o=>base-o).filter(t=>local(t)===desired);return matches.length===1?matches[0]:null}catch{return null}
 }
+const indexPrefix = (kind,value) => 'bonzo-contact:'+digest(kind+':'+value)+':';
+async function indexMessage(message) {
+ if(!message?.id)return;
+ const contacts=[email(message.email)&&['email',email(message.email)],phone(message.phone).length>=10&&['phone',phone(message.phone)]].filter(Boolean);
+ await Promise.all(contacts.map(([kind,value])=>store().setJSON(indexPrefix(kind,value)+digest(message.id),{messageKey:message.id},{onlyIfNew:true})));
+}
+export async function requestBonzoIndex() {
+ try{const origin=new URL(process.env.NOTIFICATION_SITE_URL||process.env.URL||'');if(origin.protocol!=='https:'||(process.env.NOTIFICATION_SECRET||'').length<32)return {queued:false};
+ const response=await fetch(origin.origin+'/.netlify/functions/notification-worker-background',{method:'POST',headers:{'content-type':'application/json','x-notification-secret':process.env.NOTIFICATION_SECRET},body:JSON.stringify({bonzoIndexOnly:true}),signal:AbortSignal.timeout(4000)});return {queued:response.status===202};
+ }catch{return {queued:false};}
+}
+export async function runBonzoIndex() {
+ const db=store(),key='bonzo-index:v1',leaseKey='bonzo-index:lease';
+ const prior=await db.getWithMetadata(leaseKey,{type:'json'});
+ if(prior?.data?.expiresAt>Date.now())return {busy:true};
+ const lease={owner:crypto.randomUUID(),expiresAt:Date.now()+16*60000};
+ if(!(await db.setJSON(leaseKey,lease,prior?{onlyIfMatch:prior.etag}:{onlyIfNew:true})).modified)return {busy:true};
+ try{
+  let state=await db.get(key,{type:'json'})||{status:'pending',processed:0,lastKey:''};
+  if(state.status==='complete')return state;
+  // The list contains keys only. Message bodies are read once during this resumable migration.
+  const listed=await db.list({prefix:'bonzo-message:'});
+  const remaining=(listed.blobs||[]).filter(blob=>blob.key>(state.lastKey||'')).sort((a,b)=>a.key.localeCompare(b.key));
+  const selected=remaining.slice(0,300);
+  for(let offset=0;offset<selected.length;offset+=10){
+   const batch=selected.slice(offset,offset+10);
+   await Promise.all(batch.map(async blob=>{const message=await db.get(blob.key,{type:'json'});if(message)await indexMessage({...message,id:blob.key});}));
+   state={status:'running',processed:state.processed+batch.length,lastKey:batch.at(-1).key,updatedAt:new Date().toISOString()};
+   await db.setJSON(key,state);
+  }
+  state={...state,status:remaining.length>selected.length?'running':'complete',updatedAt:new Date().toISOString()};
+  await db.setJSON(key,state);return state;
+ }catch(error){const state=await db.get(key,{type:'json'})||{processed:0,lastKey:''};await db.setJSON(key,{...state,status:'paused',updatedAt:new Date().toISOString()});throw error;}
+ finally{const current=await db.getWithMetadata(leaseKey,{type:'json'});if(current?.data?.owner===lease.owner)await db.setJSON(leaseKey,{...lease,expiresAt:0},{onlyIfMatch:current.etag});}
+}
 export async function saveBonzoMessage(payload){
  if(!['messages.outgoing.created','messages.outgoing.updated'].includes(payload?.event))return {ignored:true};
  const p=payload.prospect,m=payload.additional?.message;
@@ -24,9 +59,9 @@ export async function saveBonzoMessage(payload){
  const key='bonzo-message:'+digest(`${p.business?.id||''}:${p.id}:${m.id}`),s=store();
  for(let attempt=0;attempt<5;attempt++){
   const old=await s.getWithMetadata(key,{type:'json'});
-  if(old&&old.data.updated>=updated)return {duplicate:true};
+  if(old&&old.data.updated>=updated){await indexMessage(old.data);return {duplicate:true};}
   const row={id:key,prospectId:String(p.id),messageId:String(m.id),...contact,type:m.type,status:m.status,campaign:Boolean(m.campaign_id),sentAt:Math.max(created,scheduled),updated,accepted,rejectionReason,receivedAt:new Date().toISOString()};
-  const result=await s.setJSON(key,row,old?{onlyIfMatch:old.etag}:{onlyIfNew:true});if(result.modified){await s.setJSON('bonzo-hook:latest',{at:row.receivedAt});return {saved:true}}
+  const result=await s.setJSON(key,row,old?{onlyIfMatch:old.etag}:{onlyIfNew:true});if(result.modified){await indexMessage(row);await s.setJSON('bonzo-hook:latest',{at:row.receivedAt});return {saved:true}}
  }
  throw Error('Concurrent update; retry delivery.');
 }
@@ -44,15 +79,16 @@ export async function bonzoStatus(){return {enabled:bonzoEnabled(),lastReceivedA
 export async function bonzoDiagnostic(id, cursor='') {
  const row=await store().get('followup:'+id,{type:'json'});
  if(!row)return null;
- let position={offset:0};
- if(cursor){try{position=JSON.parse(Buffer.from(cursor,'base64url').toString());if(!Number.isInteger(position.offset)||position.offset<0||typeof(position.page||'')!=='string')throw Error();}catch{throw Error('Invalid diagnostic cursor.');}}
- const db=store();
- const [event,lastRejected,page]=await Promise.all([db.get('event:'+row.eventSlug,{type:'json'}),db.get('bonzo-hook:last-rejected',{type:'json'}),db.list({prefix:'bonzo-message:',...(position.page?{cursor:position.page}:{})})]);
- const keys=(page.blobs||[]).slice(position.offset,position.offset+60);
- const messages=[];
- for(let offset=0;offset<keys.length;offset+=12){const batch=await Promise.all(keys.slice(offset,offset+12).map(blob=>db.get(blob.key,{type:'json'})));messages.push(...batch.filter(Boolean));}
- const nextPosition=position.offset+keys.length<(page.blobs||[]).length?{page:position.page||'',offset:position.offset+keys.length}:page.cursor?{page:page.cursor,offset:0}:null;
- const nextCursor=nextPosition?Buffer.from(JSON.stringify(nextPosition)).toString('base64url'):'';
+ const db=store(),indexStatus=await db.get('bonzo-index:v1',{type:'json'});
+ if(indexStatus?.status!=='complete')return {indexPending:true,indexStatus:indexStatus||{status:'pending',processed:0},candidate:[row.firstName,row.lastName].filter(Boolean).join(' '),event:row.eventName};
+ let offset=0;if(cursor){offset=Number(cursor);if(!Number.isInteger(offset)||offset<0)throw Error('Invalid diagnostic cursor.');}
+ const prefixes=[email(row.email)&&indexPrefix('email',email(row.email)),phone(row.phone).length>=10&&indexPrefix('phone',phone(row.phone))].filter(Boolean);
+ const [event,lastRejected,pages]=await Promise.all([db.get('event:'+row.eventSlug,{type:'json'}),db.get('bonzo-hook:last-rejected',{type:'json'}),Promise.all(prefixes.map(prefix=>db.list({prefix})))]);
+ const indexKeys=[...new Map(pages.flatMap(page=>(page.blobs||[]).map(blob=>[blob.key.split(':').at(-1),blob.key]))).values()].sort();
+ const selected=indexKeys.slice(offset,offset+60),messageMap=new Map();
+ for(let start=0;start<selected.length;start+=12){await Promise.all(selected.slice(start,start+12).map(async key=>{const pointer=await db.get(key,{type:'json'});if(pointer?.messageKey){const message=await db.get(pointer.messageKey,{type:'json'});if(message)messageMap.set(pointer.messageKey,message);}}));}
+ const messages=[...messageMap.values()],keys=selected;
+ const nextCursor=offset+selected.length<indexKeys.length?String(offset+selected.length):'';
  const end=eventEnd(event),state=outreachState(row,event,messages);
  const related=messages.filter(m=>(email(row.email)&&email(row.email)===m.email)||(phone(row.phone).length>=10&&phone(row.phone)===m.phone));
  const evidence=related.sort((a,b)=>b.sentAt-a.sentAt).map(m=>{

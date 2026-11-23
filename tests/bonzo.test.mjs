@@ -24,18 +24,27 @@ test('no Bonzo setup retains existing independent reminders and never exposes st
 test('pending batches recheck Bonzo before retrying and cancel contacted candidates',async()=>{await queueCandidate(candidate);globalThis.fetch=async()=>{throw Error('temporary send failure')};await runNotifications();assert.ok([...testDB.values()].some(j=>j.status==='pending'&&j.payload));await hook(req(payload()));globalThis.fetch=async()=>{throw Error('must not send contacted candidate')};const r=await runNotifications();assert.equal(r.failed,0);assert.ok([...testDB.values()].some(j=>j.status==='cancelled'&&j.payload))});
 test('phone-only attendee matches normalized contact; outreach does not bypass manual opt-out',async()=>{await hook(req(payload()));await queueCandidate({...candidate,email:''});assert.equal((await notificationRows())[0].status,'Contacted in Bonzo');const row=(await notificationRows())[0];testDB.set('followup-stop:'+row.id,{id:row.id,stopped:true,reason:'Dropped out'});assert.equal((await notificationRows())[0].status,'Stopped');await runNotifications();assert.equal(sent.length,0)});
 test('candidate diagnostic distinguishes missing delivery, conflicting contact, queued status and valid post-event messages',async()=>{
- const {bonzoDiagnostic}=await import('../netlify/functions/_bonzo.mjs');await queueCandidate(candidate);const id=(await notificationRows())[0].id;
+ const {bonzoDiagnostic,runBonzoIndex}=await import('../netlify/functions/_bonzo.mjs');await runBonzoIndex();await queueCandidate(candidate);const id=(await notificationRows())[0].id;
  let result=await bonzoDiagnostic(id);assert.equal(result.relatedMessages,0);assert.match(result.explanation,/No saved Bonzo message/);
  await hook(req(payload({id:1,status:'queued'})));await hook(req(payload({id:2},{prospect:{id:11,email:'different@example.com',phone:'+13135551212'}})));await hook(req(payload({id:3})));
  result=await bonzoDiagnostic(id);assert.equal(result.relatedMessages,3);assert.equal(result.messages.filter(m=>m.qualifies).length,1);assert.ok(result.messages.some(m=>m.contactConflict));assert.ok(result.messages.some(m=>m.reason.includes('status is not')));assert.equal(result.status,'Contacted in Bonzo');assert.ok(!JSON.stringify(result).includes('test-hook-secret'));assert.ok(!JSON.stringify(result).includes('person@example.com'));
 });
 test('invalid authenticated hook deliveries record a safe rejection reason without message text',async()=>{
- const {bonzoDiagnostic}=await import('../netlify/functions/_bonzo.mjs');await queueCandidate(candidate);const id=(await notificationRows())[0].id;
+ const {bonzoDiagnostic,runBonzoIndex}=await import('../netlify/functions/_bonzo.mjs');await runBonzoIndex();await queueCandidate(candidate);const id=(await notificationRows())[0].id;
  const response=await hook(req(payload({created_at:'not-a-date',content:'private message text'})));assert.equal(response.status,400);
  const result=await bonzoDiagnostic(id);assert.equal(result.lastRejected.reason,'Invalid message timestamp.');assert.ok(!JSON.stringify(result).includes('private message text'));
 });
-test('diagnostic scans bounded batches and finds a match after the first batch',async()=>{
- const {bonzoDiagnostic}=await import('../netlify/functions/_bonzo.mjs');await queueCandidate(candidate);const id=(await notificationRows())[0].id;
+test('indexed diagnostic reads only the candidate activity after one background pass',async()=>{
+ const {bonzoDiagnostic,runBonzoIndex}=await import('../netlify/functions/_bonzo.mjs');await runBonzoIndex();await queueCandidate(candidate);const id=(await notificationRows())[0].id;
  for(let i=0;i<125;i++)testDB.set('bonzo-message:batch-'+i,{id:'batch-'+i,messageId:String(i),prospectId:'11',email:i===124?candidate.email:'unrelated@example.com',phone:'',type:'sms',status:'sent',accepted:true,sentAt:boundary+3600000,receivedAt:new Date().toISOString()});
- let cursor='',count=0,found=false,calls=0;do{const result=await bonzoDiagnostic(id,cursor);assert.ok(result.scanned<=60);count+=result.scanned;found ||=result.messages.some(message=>message.qualifies);cursor=result.nextCursor;calls++;}while(cursor);assert.equal(count,125);assert.equal(calls,3);assert.equal(found,true);
+ testDB.delete('bonzo-index:v1');await runBonzoIndex();let cursor='',count=0,found=false,calls=0;do{const result=await bonzoDiagnostic(id,cursor);assert.ok(result.scanned<=60);count+=result.scanned;found ||=result.messages.some(message=>message.qualifies);cursor=result.nextCursor;calls++;}while(cursor);assert.equal(count,1);assert.equal(calls,1);assert.equal(found,true);
+});
+
+test('background index resumes, avoids concurrent work and uses current message state',async()=>{
+ const {runBonzoIndex,bonzoDiagnostic}=await import('../netlify/functions/_bonzo.mjs');await queueCandidate(candidate);const id=(await notificationRows())[0].id;
+ for(let i=0;i<310;i++){const key='bonzo-message:'+String(i).padStart(4,'0');testDB.set(key,{id:key,messageId:String(i),email:i===309?candidate.email:'other@example.com',phone:'',accepted:true,type:'sms',status:'sent',sentAt:boundary+3600000});}
+ assert.equal((await bonzoDiagnostic(id)).indexPending,true);
+ const first=await runBonzoIndex();assert.equal(first.processed,300);assert.equal(first.status,'running');const second=await runBonzoIndex();assert.equal(second.processed,310);assert.equal(second.status,'complete');assert.equal((await bonzoDiagnostic(id)).messages.length,1);
+ testDB.set('bonzo-message:0309',{...testDB.get('bonzo-message:0309'),accepted:false,status:'failed'});assert.equal((await bonzoDiagnostic(id)).messages[0].qualifies,false);
+ testDB.set('bonzo-index:lease',{owner:'other',expiresAt:Date.now()+60000});assert.equal((await runBonzoIndex()).busy,true);
 });

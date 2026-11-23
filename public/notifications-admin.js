@@ -12,15 +12,16 @@ async function showBonzoDiagnostic(id){
  const d=dialog('Bonzo outreach diagnostic'),body=node('div'),progress=node('p');d.append(progress,body);d.showModal();
  let cursor='',scanned=0,result,all=[];
  try{
-  do{progress.textContent='Checking saved messages… '+scanned+' reviewed. Keep this window open.';
+  do{progress.textContent='Checking this candidate’s indexed activity… '+scanned+' reviewed. Keep this window open.';
    result=await api('/.netlify/functions/notifications?view=bonzo-diagnostic&id='+encodeURIComponent(id)+'&cursor='+encodeURIComponent(cursor));
+   if(result.indexPending){progress.textContent='Preparing candidate lookup once in the background · '+(result.indexStatus.processed||0)+' existing messages indexed. You can close this window; indexing continues.';body.replaceChildren(node('h3',result.candidate+' · '+result.event));if(result.dispatch?.queued===false){progress.textContent+=' Background processing could not be started. Check the notification site URL and secret settings, then reopen this check.';return;}await new Promise(resolve=>setTimeout(resolve,8000));if(!d.open)return;cursor='';continue;}
    scanned+=result.scanned||0;all.push(...result.messages);cursor=result.nextCursor||'';
    body.replaceChildren(node('h3',result.candidate+' · '+result.event),node('p','Event ended: '+(result.eventEnd?new Date(result.eventEnd).toLocaleString():'Not configured')));
    if(!d.open)return;
-  }while(cursor);
+  }while(cursor||result.indexPending);
   const qualifies=all.some(message=>message.qualifies);
   progress.textContent=qualifies?'Qualifying post-event outreach found. A fresh report should show Contacted.':all.length?'Related messages found, but none qualify. See the reasons below.':'No saved message matches this candidate’s email or phone. The site has no matching message delivery to evaluate.';
-  body.append(node('p',scanned+' saved messages checked; '+all.length+' related messages found.'));
+  body.append(node('p',scanned+' candidate index entries checked; '+all.length+' related messages found.'));
   if(result.lastRejected)body.append(node('p','Latest rejected hook delivery (any candidate): '+new Date(result.lastRejected.at).toLocaleString()+' · '+result.lastRejected.reason+'. Logging starts with the diagnostic update.'));
   for(const message of all.sort((a,b)=>b.sentAt.localeCompare(a.sentAt))){const card=node('article');card.className='event-card';card.append(node('strong',message.reason),node('p',message.type+' · '+message.status+' · Message '+message.messageId),node('p','Sent: '+message.sentAt+' · Received: '+message.receivedAt),node('p','Email matches: '+message.emailMatch+' · Phone matches: '+message.phoneMatch));body.append(card);}
  }catch(error){progress.textContent='Check incomplete after '+scanned+' messages. '+error.message;}
