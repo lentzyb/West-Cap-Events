@@ -23,3 +23,9 @@ The package includes all prior features. Other guides:
 - COVER-VIDEO-CROPS-COLORS.md: cover video, photo shapes and color styles
 
 Run `npm ci`, `npm test`, and `npm run build`. Deploy to the same Netlify site, including functions.
+
+## Targeted Bonzo outreach checks
+
+Set `BONZO_API_TOKEN` in Netlify Functions, using an account with access to the event recruiters' prospects and conversation history. The server uses GET requests to `https://app.getbonzo.com/api/v3/prospects` with a contact search and `/prospects/{id}/messages`. Search results must match normalized email or phone with no conflicting shared contact field before any messages are fetched. Search pagination is bounded; a broad result, denied permission, invalid payload, rate limit, or unfinished check holds reminders and appears as Unverified. A missing visible prospect does not prove the person is absent from Bonzo.
+
+Diagnostics advance one candidate page per request and bypass the old global index migration. Background report/reminder workers refresh ended, external event follow-ups in batches of three with an eight-minute budget. A candidate check stops once qualifying post-event outreach is found; background refresh skips already contacted candidates. Completed checks cache for ten minutes, while webhooks keep matching message state current. Only message metadata is stored, never message content or the API token. Existing hook-only setups retain their previous behavior. Current schema: https://app.getbonzo.com/docs/v3

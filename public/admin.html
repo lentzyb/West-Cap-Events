@@ -147,7 +147,7 @@
     <section id="tab-settings" class="tab-panel" hidden>
       <section class="card"><h2>Monday.com Recruiting Analytics</h2><p>This is read-only. The event platform reads Hires and Candidate Source from your connected Monday board. It also recognizes Orientation and Active Roster when present. Candidates are matched to event registrations by email or phone; source totals show all items in Hires. SELECT SOURCE is shown as Not specified.</p><div id="mondayStatus" class="message">Not checked yet.</div><button id="loadMondayButton" class="button secondary" type="button">Check / Refresh Monday Connection</button><form id="mondayForm" hidden><div class="form-grid"><label>Email Column<select id="mondayEmail" required></select></label><label>Phone Column<select id="mondayPhone" required></select></label><label>Stage Column<select id="mondayStage" required></select></label><label>Production Volume Column<select id="mondayVolume"><option value="">No volume column yet</option></select></label><label class="full">Stages that count as Joined WCL<input id="mondayJoinedStages" value="Confirmed, Orientation" placeholder="Confirmed, Orientation"></label></div><button class="button" type="submit">Save Monday Mapping</button><p class="message" id="mondayMessage"></p></form><h3>Netlify variables required</h3><pre>MONDAY_API_TOKEN
 MONDAY_BOARD_ID</pre><p>The API token stays in Netlify and is never exposed in the browser or GitHub.</p></section>
-      <section class="card"><h2>Bonzo Webhook Integration</h2><div id="bonzoStatus">Loading…</div><h3>Netlify variable required</h3><pre>ADMIN_PASSWORD</pre><p><strong>BONZO_API_TOKEN is not used.</strong></p><ol><li>Create a campaign webhook in Bonzo for the correct owner.</li><li>Save it once in the Bonzo Campaign Library.</li><li>Choose it for that team member when creating or editing an event.</li></ol></section>
+      <section class="card"><h2>Bonzo Webhook Integration</h2><div id="bonzoStatus">Loading…</div><h3>Netlify variable required</h3><pre>ADMIN_PASSWORD</pre><p>For targeted outreach checks, save <strong>BONZO_API_TOKEN</strong> in Netlify with prospect and conversation access. The token stays on the server. Candidate checks read only exact matching prospects; incomplete checks hold reminders. Campaign webhooks below remain separate.</p><ol><li>Create a campaign webhook in Bonzo for the correct owner.</li><li>Save it once in the Bonzo Campaign Library.</li><li>Choose it for that team member when creating or editing an event.</li></ol></section>
     </section>
   </div>
 </main>
@@ -155,7 +155,7 @@ MONDAY_BOARD_ID</pre><p>The API token stays in Netlify and is never exposed in t
 <script src="/sponsor-summary.js?v=20261119-email-layout"></script>
 <script src="/sponsorships-admin.js?v=20261118-summary"></script>
 <script src="/monday-sources.js"></script>
-<script src="/notifications-admin.js?v=20261123-bonzo-index"></script>
+<script src="/notifications-admin.js?v=20261123-bonzo-targeted"></script>
 <script src="/media-prep.js?v=20261110-media-prep"></script>
 <script src="/page-editor.js?v=20261110-media-prep"></script>
 <script src="/gallery-editor.js?v=20261110-media-prep"></script>

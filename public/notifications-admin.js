@@ -14,11 +14,14 @@ async function showBonzoDiagnostic(id){
  try{
   do{progress.textContent='Checking this candidate’s indexed activity… '+scanned+' reviewed. Keep this window open.';
    result=await api('/.netlify/functions/notifications?view=bonzo-diagnostic&id='+encodeURIComponent(id)+'&cursor='+encodeURIComponent(cursor));
+   if(result.lookupError){progress.textContent=result.lookupError+' Reminders are held until verification succeeds.';return;}
+   if(result.lookupPending){progress.textContent='Checking only this candidate in Bonzo · '+(result.reviewed||0)+' messages reviewed.';body.replaceChildren(node('h3',result.candidate+' · '+result.event));await new Promise(resolve=>setTimeout(resolve,200));if(!d.open)return;cursor='';continue;}
    if(result.indexPending){progress.textContent='Preparing candidate lookup once in the background · '+(result.indexStatus.processed||0)+' existing messages indexed. You can close this window; indexing continues.';body.replaceChildren(node('h3',result.candidate+' · '+result.event));if(result.dispatch?.queued===false){progress.textContent+=' Background processing could not be started. Check the notification site URL and secret settings, then reopen this check.';return;}await new Promise(resolve=>setTimeout(resolve,8000));if(!d.open)return;cursor='';continue;}
    scanned+=result.scanned||0;all.push(...result.messages);cursor=result.nextCursor||'';
    body.replaceChildren(node('h3',result.candidate+' · '+result.event),node('p','Event ended: '+(result.eventEnd?new Date(result.eventEnd).toLocaleString():'Not configured')));
    if(!d.open)return;
-  }while(cursor||result.indexPending);
+  }while(cursor||result.indexPending||result.lookupPending);
+  if(result.apiCheck?.outcome==='no_match'){progress.textContent='No exact matching prospect is visible to this Bonzo API account. Check account access and contact details; outreach is unverified.';return;}
   const qualifies=all.some(message=>message.qualifies);
   progress.textContent=qualifies?'Qualifying post-event outreach found. A fresh report should show Contacted.':all.length?'Related messages found, but none qualify. See the reasons below.':'No saved message matches this candidate’s email or phone. The site has no matching message delivery to evaluate.';
   body.append(node('p',scanned+' candidate index entries checked; '+all.length+' related messages found.'));
