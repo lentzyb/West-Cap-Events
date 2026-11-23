@@ -58,3 +58,11 @@ test('candidate history stops at proof of post-event outreach and background ski
  assert.equal(result.messages[0].qualifies,true);assert.equal(calls.filter(x=>x.includes('/messages?')).length,1);
  const count=calls.length;await refreshEventCandidates(saveBonzoMessage,eventEnd,await bonzoMessages(),outreachState);assert.equal(calls.length,count);
 });
+test('diagnostics preserve safe HTTP, timeout, JSON and timestamp failure reasons without raw response details',async()=>{
+ for(const [response,expected] of [
+  [async()=>new Response('private provider details',{status:500}),/HTTP 500/],
+  [async()=>new Response('private HTML',{status:200}),/non-JSON/],
+  [async()=>{throw new DOMException('private request URL','TimeoutError')},/timed out/]
+ ]){testDB.delete(lookupKey(row));globalThis.fetch=response;const state=await lookupStep(row,saveBonzoMessage);assert.match(state.error,expected);assert.match(state.error,/Stage: candidate search/);assert.ok(!JSON.stringify(state).includes('private '));}
+ testDB.delete(lookupKey(row));globalThis.fetch=async url=>page(String(url).includes('/messages?')?[{...message,created_at:'2026-01-02 13:00:00'}]:[prospect]);const state=await finish();assert.match(state.error,/timestamp/);assert.match(state.error,/Stage: candidate messages/);
+});
