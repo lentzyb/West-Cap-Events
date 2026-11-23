@@ -7,7 +7,7 @@ export const lookupKey=row=>'bonzo-lookup:'+crypto.createHash('sha256').update(J
 const exact=(row,p)=>{const e=email(row.email),f=phone(row.phone),pe=email(p.email),pf=phone(p.phone);return Boolean((e&&e===pe)||(f.length>=10&&f===pf))&&(!e||!pe||e===pe)&&(!(f.length>=10&&pf.length>=10)||f===pf)};
 async function get(path){
  const cooldown=await store().get('bonzo-api:cooldown',{type:'json'});if(cooldown?.until>Date.now())throw Error(cooldown.error);
- let response;try{response=await fetch('https://app.getbonzo.com/api/v3/'+path,{method:'GET',redirect:'error',headers:{accept:'application/json',authorization:'Bearer '+process.env.BONZO_API_TOKEN.trim()},signal:AbortSignal.timeout(10000)});}catch(error){throw Error(error.name==='TimeoutError'||error.name==='AbortError'?'Bonzo request timed out.':'Bonzo connection failed or redirected.');}
+ let response;try{response=await fetch('https://app.getbonzo.com/api/v3/'+path,{method:'GET',redirect:'error',headers:{accept:'application/json',authorization:'Bearer '+process.env.BONZO_API_TOKEN.trim()},signal:AbortSignal.timeout(20000)});}catch(error){throw Error(error.name==='TimeoutError'||error.name==='AbortError'?'Bonzo request timed out.':'Bonzo connection failed or redirected.');}
  if(!response.ok){const error=response.status===401?'Bonzo rejected the API token.':response.status===403?'Bonzo API permission or account access is missing.':response.status===429?'Bonzo rate limit reached. Try again later.':'Bonzo lookup failed (HTTP '+response.status+').';if([401,403,429].includes(response.status))await store().setJSON('bonzo-api:cooldown',{until:Date.now()+60000,error});throw Error(error);}
  let body;try{body=await response.json();}catch{throw Error('Bonzo returned a non-JSON response.');}if(!Array.isArray(body.data))throw Error('Bonzo returned an unexpected response.');return body;
 }
@@ -21,7 +21,7 @@ async function advanceLookup(row,save,boundary){
  try{
   if(!terms.length)throw Error('Candidate needs an email or phone number.');
   if(state.phase==='search'){
-   const body=await get('prospects?'+new URLSearchParams({search:terms[state.term],show_all:'1',per_page:'50',page:String(state.page)}));
+   const body=await get('prospects?'+new URLSearchParams({search:terms[state.term],defer_count:'1',exact_count:'0',per_page:'25',page:String(state.page)}));
    for(const p of body.data){if(exact(row,p)&&/^\d+$/.test(String(p.id))&&!state.prospects.some(x=>x.id===String(p.id)))state.prospects.push({id:String(p.id),email:email(p.email),phone:phone(p.phone),business:p.business?.id||''});}
    if(hasNext(body,state.page)){if(state.page>=5)throw Error('Candidate search is too broad; lookup is incomplete.');state.page++;}
    else{state.term++;state.page=1;if(state.term>=terms.length){state.phase='messages';if(!state.prospects.length)state={...state,complete:true,outcome:'no_match'};}}

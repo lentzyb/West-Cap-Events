@@ -66,3 +66,8 @@ test('diagnostics preserve safe HTTP, timeout, JSON and timestamp failure reason
  ]){testDB.delete(lookupKey(row));globalThis.fetch=response;const state=await lookupStep(row,saveBonzoMessage);assert.match(state.error,expected);assert.match(state.error,/Stage: candidate search/);assert.ok(!JSON.stringify(state).includes('private '));}
  testDB.delete(lookupKey(row));globalThis.fetch=async url=>page(String(url).includes('/messages?')?[{...message,created_at:'2026-01-02 13:00:00'}]:[prospect]);const state=await finish();assert.match(state.error,/timestamp/);assert.match(state.error,/Stage: candidate messages/);
 });
+
+test('candidate search uses bounded pagination and deferred counts, never show_all',async()=>{
+ globalThis.fetch=async url=>{const u=new URL(url);assert.equal(u.searchParams.has('show_all'),false);assert.equal(u.searchParams.get('defer_count'),'1');assert.equal(u.searchParams.get('exact_count'),'0');assert.equal(u.searchParams.get('per_page'),'25');return page([prospect]);};
+ assert.equal((await lookupStep(row,saveBonzoMessage)).error,undefined);
+});
