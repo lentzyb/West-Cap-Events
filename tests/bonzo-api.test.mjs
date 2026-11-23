@@ -71,3 +71,15 @@ test('candidate search uses bounded pagination and deferred counts, never show_a
  globalThis.fetch=async url=>{const u=new URL(url);assert.equal(u.searchParams.has('show_all'),false);assert.equal(u.searchParams.get('defer_count'),'1');assert.equal(u.searchParams.get('exact_count'),'0');assert.equal(u.searchParams.get('per_page'),'25');return page([prospect]);};
  assert.equal((await lookupStep(row,saveBonzoMessage)).error,undefined);
 });
+test('direct prospect link validates the exact record and bypasses search on subsequent checks',async()=>{
+ const {verifyDirectProspect,prospectId}=await import('../netlify/functions/_bonzo-api.mjs');
+ assert.equal(prospectId('https://platform.getbonzo.com/prospect/12'),'12');assert.throws(()=>prospectId('https://evil.example/prospect/12'));
+ globalThis.fetch=async url=>{calls.push(String(url));assert.ok(!String(url).includes('search='));return String(url).includes('/messages?')?page([message]):Response.json({data:prospect,last_subject:''});};
+ await verifyDirectProspect(row,'https://platform.getbonzo.com/prospect/12');let result;do{result=await bonzoDiagnostic('candidate');}while(result.lookupPending);
+ assert.equal(result.messages[0].qualifies,true);assert.ok(calls.some(url=>url.endsWith('/prospects/12')));
+});
+test('direct prospect access denial and conflicting contact cannot save a link or fetch messages',async()=>{
+ const {verifyDirectProspect}=await import('../netlify/functions/_bonzo-api.mjs');
+ globalThis.fetch=async()=>new Response('',{status:403});await assert.rejects(()=>verifyDirectProspect(row,'12'),/permission/);assert.ok(![...testDB.keys()].some(k=>k.startsWith('bonzo-direct:')));
+ testDB.delete('bonzo-api:cooldown');globalThis.fetch=async()=>Response.json({data:{...prospect,email:'wrong@example.com'}});await assert.rejects(()=>verifyDirectProspect(row,'12'),/does not exactly match/);assert.ok(![...testDB.keys()].some(k=>k.startsWith('bonzo-direct:')));
+});
