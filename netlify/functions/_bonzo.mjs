@@ -41,11 +41,19 @@ export function outreachState(row,event,messages,now=Date.now()){
 export const bonzoMessages=()=>bonzoEnabled()?listAll('bonzo-message:'):Promise.resolve([]);
 export async function bonzoStatus(){return {enabled:bonzoEnabled(),lastReceivedAt:(await store().get('bonzo-hook:latest',{type:'json'}))?.at||'',endpoint:'https://westcap-events.netlify.app/.netlify/functions/bonzo-events',history:'Only activity received after the hook is connected is tracked. Earlier Bonzo history has not been imported.'}}
 
-export async function bonzoDiagnostic(id) {
+export async function bonzoDiagnostic(id, cursor='') {
  const row=await store().get('followup:'+id,{type:'json'});
  if(!row)return null;
- const [events,messages,lastRejected]=await Promise.all([listAll('event:'),bonzoMessages(),store().get('bonzo-hook:last-rejected',{type:'json'})]);
- const event=events.find(e=>e.slug===row.eventSlug),end=eventEnd(event),state=outreachState(row,event,messages);
+ let position={offset:0};
+ if(cursor){try{position=JSON.parse(Buffer.from(cursor,'base64url').toString());if(!Number.isInteger(position.offset)||position.offset<0||typeof(position.page||'')!=='string')throw Error();}catch{throw Error('Invalid diagnostic cursor.');}}
+ const db=store();
+ const [event,lastRejected,page]=await Promise.all([db.get('event:'+row.eventSlug,{type:'json'}),db.get('bonzo-hook:last-rejected',{type:'json'}),db.list({prefix:'bonzo-message:',...(position.page?{cursor:position.page}:{})})]);
+ const keys=(page.blobs||[]).slice(position.offset,position.offset+60);
+ const messages=[];
+ for(let offset=0;offset<keys.length;offset+=12){const batch=await Promise.all(keys.slice(offset,offset+12).map(blob=>db.get(blob.key,{type:'json'})));messages.push(...batch.filter(Boolean));}
+ const nextPosition=position.offset+keys.length<(page.blobs||[]).length?{page:position.page||'',offset:position.offset+keys.length}:page.cursor?{page:page.cursor,offset:0}:null;
+ const nextCursor=nextPosition?Buffer.from(JSON.stringify(nextPosition)).toString('base64url'):'';
+ const end=eventEnd(event),state=outreachState(row,event,messages);
  const related=messages.filter(m=>(email(row.email)&&email(row.email)===m.email)||(phone(row.phone).length>=10&&phone(row.phone)===m.phone));
  const evidence=related.sort((a,b)=>b.sentAt-a.sentAt).map(m=>{
   const emailMatch=Boolean(email(row.email)&&email(row.email)===m.email),phoneMatch=Boolean(phone(row.phone).length>=10&&phone(row.phone)===m.phone);
@@ -53,5 +61,5 @@ export async function bonzoDiagnostic(id) {
   const reason=conflict?'Email or phone differs; contact match rejected':!m.accepted?(m.rejectionReason||'Message was not accepted as a successful outgoing send'):end===null?'Event end settings need correction':m.sentAt<=end?'Message was sent before the event ended':m.sentAt>Date.now()?'Message timestamp is in the future':'Qualifying post-event outreach';
   return {messageId:m.messageId,prospectId:m.prospectId,type:m.type,status:m.status,emailMatch,phoneMatch,contactConflict:conflict,sentAt:Number.isFinite(m.sentAt)?new Date(m.sentAt).toISOString():'',receivedAt:m.receivedAt,qualifies:m.accepted&&!conflict&&end!==null&&m.sentAt>end&&m.sentAt<=Date.now(),reason};
  });
- return {candidate:[row.firstName,row.lastName].filter(Boolean).join(' '),event:row.eventName,eventEnd:end===null?'':new Date(end).toISOString(),status:state.status,relatedMessages:evidence.length,messages:evidence.slice(0,20),lastRejected:lastRejected||null,explanation:!related.length?'No saved Bonzo message matches this candidate’s email or phone. Their presence in Bonzo alone does not prove a message delivery reached this site.':evidence.some(m=>m.qualifies)?'A qualifying post-event message is saved. A fresh report should show Contacted.':'Related messages were received but none satisfy all outreach rules. See the reasons below.'};
+ return {nextCursor,scanned:keys.length,candidate:[row.firstName,row.lastName].filter(Boolean).join(' '),event:row.eventName,eventEnd:end===null?'':new Date(end).toISOString(),status:state.status,relatedMessages:evidence.length,messages:evidence,lastRejected:lastRejected||null,explanation:!related.length?'No saved Bonzo message matches this candidate’s email or phone. Their presence in Bonzo alone does not prove a message delivery reached this site.':evidence.some(m=>m.qualifies)?'A qualifying post-event message is saved. A fresh report should show Contacted.':'Related messages were received but none satisfy all outreach rules. See the reasons below.'};
 }

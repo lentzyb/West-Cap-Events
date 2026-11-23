@@ -48,3 +48,7 @@ test('private staff check-in supports guest search, independent arrivals, undo a
  token=new URL((await (await checkin(admin(false,'other'))).json()).url).hash.slice(1);data=await (await checkin(request('GET',null,'','other'))).json();assert.equal(data.total,1);assert.equal(data.rows[0].name,'Outside Attendee');assert.equal((await checkin(request('POST',{id:data.rows[0].id,person:'guest',checked:true},'','other'))).status,404);
  const unauthorized=new Request('https://example.com/check-in?slug=party&action=access',{method:'POST',body:'{}'});assert.equal((await checkin(unauthorized)).status,401);
 });
+test('direct diagnostic candidate search does not read Bonzo message history',async()=>{
+ testDB.set('followup:brad',{id:'brad',firstName:'Brad',lastName:'Example',eventName:'Why West Cap'});testDB.set('bonzo-message:unreadable',()=>{});
+ const result=await notifications(new Request('https://example.com/notifications?view=candidate-search&q=Brad',{headers:{'x-admin-password':'test-admin'}}));assert.equal(result.status,200);assert.equal((await result.json()).rows[0].id,'brad');
+});

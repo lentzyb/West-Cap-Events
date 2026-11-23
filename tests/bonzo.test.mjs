@@ -34,3 +34,8 @@ test('invalid authenticated hook deliveries record a safe rejection reason witho
  const response=await hook(req(payload({created_at:'not-a-date',content:'private message text'})));assert.equal(response.status,400);
  const result=await bonzoDiagnostic(id);assert.equal(result.lastRejected.reason,'Invalid message timestamp.');assert.ok(!JSON.stringify(result).includes('private message text'));
 });
+test('diagnostic scans bounded batches and finds a match after the first batch',async()=>{
+ const {bonzoDiagnostic}=await import('../netlify/functions/_bonzo.mjs');await queueCandidate(candidate);const id=(await notificationRows())[0].id;
+ for(let i=0;i<125;i++)testDB.set('bonzo-message:batch-'+i,{id:'batch-'+i,messageId:String(i),prospectId:'11',email:i===124?candidate.email:'unrelated@example.com',phone:'',type:'sms',status:'sent',accepted:true,sentAt:boundary+3600000,receivedAt:new Date().toISOString()});
+ let cursor='',count=0,found=false,calls=0;do{const result=await bonzoDiagnostic(id,cursor);assert.ok(result.scanned<=60);count+=result.scanned;found ||=result.messages.some(message=>message.qualifies);cursor=result.nextCursor;calls++;}while(cursor);assert.equal(count,125);assert.equal(calls,3);assert.equal(found,true);
+});
