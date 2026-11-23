@@ -27,7 +27,7 @@ test('candidate diagnostic distinguishes missing delivery, conflicting contact, 
  const {bonzoDiagnostic,runBonzoIndex}=await import('../netlify/functions/_bonzo.mjs');await runBonzoIndex();await queueCandidate(candidate);const id=(await notificationRows())[0].id;
  let result=await bonzoDiagnostic(id);assert.equal(result.relatedMessages,0);assert.match(result.explanation,/No saved Bonzo message/);
  await hook(req(payload({id:1,status:'queued'})));await hook(req(payload({id:2},{prospect:{id:11,email:'different@example.com',phone:'+13135551212'}})));await hook(req(payload({id:3})));
- result=await bonzoDiagnostic(id);assert.equal(result.relatedMessages,3);assert.equal(result.messages.filter(m=>m.qualifies).length,1);assert.ok(result.messages.some(m=>m.contactConflict));assert.ok(result.messages.some(m=>m.reason.includes('status is not')));assert.equal(result.status,'Contacted in Bonzo');assert.ok(!JSON.stringify(result).includes('test-hook-secret'));assert.ok(!JSON.stringify(result).includes('person@example.com'));
+ result=await bonzoDiagnostic(id);assert.equal(result.relatedMessages,3);assert.equal(result.messages.filter(m=>m.qualifies).length,1);assert.ok(result.messages.some(m=>m.contactConflict));assert.ok(result.messages.some(m=>m.reason.includes('status does not')));assert.equal(result.status,'Contacted in Bonzo');assert.ok(!JSON.stringify(result).includes('test-hook-secret'));assert.ok(!JSON.stringify(result).includes('person@example.com'));
 });
 test('invalid authenticated hook deliveries record a safe rejection reason without message text',async()=>{
  const {bonzoDiagnostic,runBonzoIndex}=await import('../netlify/functions/_bonzo.mjs');await runBonzoIndex();await queueCandidate(candidate);const id=(await notificationRows())[0].id;
@@ -47,4 +47,15 @@ test('background index resumes, avoids concurrent work and uses current message 
  const first=await runBonzoIndex();assert.equal(first.processed,300);assert.equal(first.status,'running');const second=await runBonzoIndex();assert.equal(second.processed,310);assert.equal(second.status,'complete');assert.equal((await bonzoDiagnostic(id)).messages.length,1);
  testDB.set('bonzo-message:0309',{...testDB.get('bonzo-message:0309'),accepted:false,status:'failed'});assert.equal((await bonzoDiagnostic(id)).messages[0].qualifies,false);
  testDB.set('bonzo-index:lease',{owner:'other',expiresAt:Date.now()+60000});assert.equal((await runBonzoIndex()).busy,true);
+});
+
+test('fresh payload revalidates legacy rejected metadata at the same provider timestamp',async()=>{
+ const {saveBonzoMessage}=await import('../netlify/functions/_bonzo.mjs');await saveBonzoMessage(payload());
+ const key=[...testDB.keys()].find(key=>key.startsWith('bonzo-message:'));const old=testDB.get(key);delete old.parserVersion;delete old.rejectionReason;old.accepted=false;testDB.set(key,old);
+ await saveBonzoMessage(payload());assert.equal(testDB.get(key).accepted,true);assert.equal(testDB.get(key).direction,'outgoing');assert.equal(testDB.get(key).parserVersion,2);
+});
+test('answered outgoing calls count as contact only after the event',async()=>{
+ const {saveBonzoMessage}=await import('../netlify/functions/_bonzo.mjs');await saveBonzoMessage(payload({type:'call',status:'answered'}));const messages=await bonzoMessages();assert.equal(outreachState(candidate,event,messages).status,'Contacted in Bonzo');
+ assert.equal(outreachState(candidate,{...event,date:'2099-01-01'},messages).status,'Waiting for event to end');
+ await saveBonzoMessage(payload({id:2,type:'call',status:'answered',direction:'incoming'}));assert.equal((await bonzoMessages()).find(m=>m.messageId==='2').accepted,false);
 });

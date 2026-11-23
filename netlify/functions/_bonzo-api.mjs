@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import {store,listAll} from './_shared.mjs';
 const email=v=>String(v||'').trim().toLowerCase();
 const phone=v=>{const d=String(v||'').replace(/\D/g,'');return d.length===11&&d[0]==='1'?d.slice(1):d};
+export const successfulStatus=(type,status)=>['sent','delivered','completed'].includes(status)||(type==='call'&&status==='answered');
 export const apiEnabled=()=>Boolean(process.env.BONZO_API_TOKEN?.trim());
 export const lookupKey=row=>'bonzo-lookup:'+crypto.createHash('sha256').update(JSON.stringify([email(row.email),phone(row.phone),row.eventSlug,row.recruiterId||''])).digest('hex');
 const exact=(row,p)=>{const e=email(row.email),f=phone(row.phone),pe=email(p.email),pf=phone(p.phone);return Boolean((e&&e===pe)||(f.length>=10&&f===pf))&&(!e||!pe||e===pe)&&(!(f.length>=10&&pf.length>=10)||f===pf)};
@@ -30,8 +31,8 @@ export async function verifyDirectProspect(row,value){
 // One bounded API page per step; only exact contacts can lead to message requests.
 async function advanceLookup(row,save,boundary){
  const db=store(),key=lookupKey(row),prior=await db.get(key,{type:'json'});
- if(prior?.complete&&(boundary===undefined||prior.boundary===boundary)&&Date.now()-Date.parse(prior.checkedAt)<10*60000)return prior;
- let state=prior&&!prior.complete&&!prior.error&&(boundary===undefined||prior.boundary===boundary)?prior:{phase:'search',term:0,page:1,prospects:[],prospect:0,reviewed:0,complete:false,boundary};
+ if(prior?.revision===2&&prior.complete&&(boundary===undefined||prior.boundary===boundary)&&Date.now()-Date.parse(prior.checkedAt)<10*60000)return prior;
+ let state=prior?.revision===2&&!prior.complete&&!prior.error&&(boundary===undefined||prior.boundary===boundary)?prior:{phase:'search',term:0,page:1,prospects:[],prospect:0,reviewed:0,complete:false,boundary,revision:2,directions:{outgoing:0,incoming:0,other:0}};
  const linked=await db.get(directKey(row),{type:'json'});if(linked&&state.phase==='search'&&state.term===0&&state.page===1)state.phase='direct';
  const terms=[email(row.email),phone(row.phone).length>=10?phone(row.phone):''].filter(Boolean);
  try{
@@ -50,11 +51,11 @@ async function advanceLookup(row,save,boundary){
    const p=state.prospects[state.prospect];
    const body=await get('prospects/'+p.id+'/messages?page='+state.page);
    for(const m of body.data){
-    state.reviewed++;
+    state.reviewed++;const direction=['outgoing','incoming'].includes(m.direction)?m.direction:'other';state.directions||={outgoing:0,incoming:0,other:0};state.directions[direction]++;const created=Date.parse(m.created_at);if(Number.isFinite(created)&&(!state.newestAt||created>Date.parse(state.newestAt)))state.newestAt=new Date(created).toISOString();
     if(String(m.prospect_id)!==p.id)throw Error('Bonzo returned a message for a different prospect.');
     if(m.direction==='outgoing')try{await save({event:'messages.outgoing.updated',prospect:{id:p.id,email:p.email,phone:p.phone,business:{id:p.business}},additional:{message:m}});}catch(error){throw Error(error.message==='Invalid message timestamp.'?'Bonzo message timestamp is missing, ambiguous or invalid.':error.message==='Missing message or prospect ID.'?'Bonzo message identifier is missing.':error.message==='Conflicting prospect IDs.'?'Bonzo message prospect identifier conflicts.':'Saving Bonzo message metadata failed.');}
    }
-   const confirmed=Number.isFinite(boundary)&&body.data.some(m=>{const created=Date.parse(m.created_at),sent=m.send_at?Date.parse(m.send_at):created;return m.direction==='outgoing'&&['sent','delivered','completed'].includes(m.status)&&!m.error_message&&['sms','email','call','voicemail'].includes(m.type)&&Math.max(created,sent)>boundary&&Math.max(created,sent)<=Date.now();});
+   const confirmed=Number.isFinite(boundary)&&body.data.some(m=>{const created=Date.parse(m.created_at),sent=m.send_at?Date.parse(m.send_at):created;return m.direction==='outgoing'&&successfulStatus(m.type,m.status)&&!m.error_message&&['sms','email','call','voicemail'].includes(m.type)&&Math.max(created,sent)>boundary&&Math.max(created,sent)<=Date.now();});
    if(confirmed)state={...state,complete:true,outcome:'found'};
    else if(hasNext(body,state.page)){if(state.page>=100)throw Error('Candidate message history exceeded the lookup limit. Check is incomplete.');state.page++;}
    else{state.prospect++;state.page=1;if(state.prospect>=state.prospects.length)state={...state,complete:true,outcome:'found'};}
