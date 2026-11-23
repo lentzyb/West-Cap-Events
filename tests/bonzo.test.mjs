@@ -23,3 +23,14 @@ test('receiver validates IDs and timestamps and ignores unrelated events',async(
 test('no Bonzo setup retains existing independent reminders and never exposes stale errors',async()=>{delete process.env.BONZO_EVENT_HOOK_CODE;await queueCandidate(candidate);await runNotifications();assert.equal(sent.length,1)});
 test('pending batches recheck Bonzo before retrying and cancel contacted candidates',async()=>{await queueCandidate(candidate);globalThis.fetch=async()=>{throw Error('temporary send failure')};await runNotifications();assert.ok([...testDB.values()].some(j=>j.status==='pending'&&j.payload));await hook(req(payload()));globalThis.fetch=async()=>{throw Error('must not send contacted candidate')};const r=await runNotifications();assert.equal(r.failed,0);assert.ok([...testDB.values()].some(j=>j.status==='cancelled'&&j.payload))});
 test('phone-only attendee matches normalized contact; outreach does not bypass manual opt-out',async()=>{await hook(req(payload()));await queueCandidate({...candidate,email:''});assert.equal((await notificationRows())[0].status,'Contacted in Bonzo');const row=(await notificationRows())[0];testDB.set('followup-stop:'+row.id,{id:row.id,stopped:true,reason:'Dropped out'});assert.equal((await notificationRows())[0].status,'Stopped');await runNotifications();assert.equal(sent.length,0)});
+test('candidate diagnostic distinguishes missing delivery, conflicting contact, queued status and valid post-event messages',async()=>{
+ const {bonzoDiagnostic}=await import('../netlify/functions/_bonzo.mjs');await queueCandidate(candidate);const id=(await notificationRows())[0].id;
+ let result=await bonzoDiagnostic(id);assert.equal(result.relatedMessages,0);assert.match(result.explanation,/No saved Bonzo message/);
+ await hook(req(payload({id:1,status:'queued'})));await hook(req(payload({id:2},{prospect:{id:11,email:'different@example.com',phone:'+13135551212'}})));await hook(req(payload({id:3})));
+ result=await bonzoDiagnostic(id);assert.equal(result.relatedMessages,3);assert.equal(result.messages.filter(m=>m.qualifies).length,1);assert.ok(result.messages.some(m=>m.contactConflict));assert.ok(result.messages.some(m=>m.reason.includes('status is not')));assert.equal(result.status,'Contacted in Bonzo');assert.ok(!JSON.stringify(result).includes('test-hook-secret'));assert.ok(!JSON.stringify(result).includes('person@example.com'));
+});
+test('invalid authenticated hook deliveries record a safe rejection reason without message text',async()=>{
+ const {bonzoDiagnostic}=await import('../netlify/functions/_bonzo.mjs');await queueCandidate(candidate);const id=(await notificationRows())[0].id;
+ const response=await hook(req(payload({created_at:'not-a-date',content:'private message text'})));assert.equal(response.status,400);
+ const result=await bonzoDiagnostic(id);assert.equal(result.lastRejected.reason,'Invalid message timestamp.');assert.ok(!JSON.stringify(result).includes('private message text'));
+});

@@ -1,10 +1,11 @@
 import crypto from 'node:crypto';
 import {reportStatus,reportConfig,validateReport,reportSnapshot,reportCSV} from './_report.mjs';
-import {bonzoStatus} from './_bonzo.mjs';
+import {bonzoStatus,bonzoDiagnostic} from './_bonzo.mjs';
 import {publicEmailSettings,sendSelfTest} from './_email.mjs';
 import {json,requireAdmin,parseJSON,store,listAll} from './_shared.mjs';
 import {config,readiness,notificationRows,kickWorker,reasons} from './_notifications.mjs';
 export default async req=>{const auth=requireAdmin(req);if(!auth.ok)return auth.response;try{
+ if(req.method==='GET'&&new URL(req.url).searchParams.get('view')==='bonzo-diagnostic'){const result=await bonzoDiagnostic(new URL(req.url).searchParams.get('id')||'');return result?json(result):json({error:'Candidate not found.'},404);}
  if(req.method==='GET'&&new URL(req.url).searchParams.get('view')==='settings')return json({settings:await config(),reportSettings:await reportConfig()});
  if(req.method==='GET'&&new URL(req.url).searchParams.get('view')==='rows')return json({rows:await notificationRows()});
  if(req.method==='GET'){const [settings,rows,run,jobs,bonzo,report,recruiterManual]=await Promise.all([config(),new URL(req.url).searchParams.get('view')==='status'?Promise.resolve([]):notificationRows(),store().get('notification-run:latest',{type:'json'}),listAll('mailjob:'),bonzoStatus(),reportStatus(),store().get('recruiter-manual:latest',{type:'json'})]);const [requests,worker]=await Promise.all([listAll('recruiter-request:'),store().get('notification-worker:status',{type:'json'})]);return json({requests:requests.filter(r=>r.status==='pending').map(({id,createdAt})=>({id,createdAt})),worker,recruiterManual,report,bonzo,settings,email:publicEmailSettings(),readiness:readiness(),rows,run,deliveries:jobs.map(({id,kind,status,createdAt,sentAt,error,recruiterId})=>({id,kind,status,createdAt,sentAt,error,recruiterId})).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,50)})}
