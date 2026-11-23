@@ -24,3 +24,27 @@ test('bulk candidate recovery reuses a snapshot and preserves registration prior
  assert.equal(duplicate.reason,'existing registration takes priority');assert.equal(known.length,1);
  const again=await queueCandidate(candidate,known);assert.equal(again.id,known[0].id);
 });
+test('private staff check-in supports guest search, independent arrivals, undo and link replacement',async()=>{
+ const {default:checkin}=await import('../netlify/functions/check-in.mjs');
+ globalThis.testDB.set('event:party',{slug:'party',name:'Holiday Party',questionnaire:'internal'});
+ globalThis.testDB.set('event:other',{slug:'other',name:'External Event',questionnaire:'external'});
+ globalThis.testDB.set('registration:party:one',{id:'one',firstName:'Matt',lastName:'Muskan',email:'private@example.com',phone:'3135551234',plusOneFirstName:'Alex',plusOneLastName:'Muskan'});
+ globalThis.testDB.set('attendee:party:duplicate',{id:'duplicate',firstName:'Matt',lastName:'Muskan',email:'private@example.com'});
+ globalThis.testDB.set('attendee:other:two',{id:'two',firstName:'Outside',lastName:'Attendee'});
+ let token='';
+ const request=(method='GET',body,q='',slug='party')=>new Request('https://example.com/check-in?slug='+slug+'&q='+encodeURIComponent(q),{method,headers:{'x-checkin-code':token,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+ const admin=(rotate=false,slug='party')=>new Request('https://example.com/check-in?slug='+slug+'&action=access',{method:'POST',headers:{'x-admin-password':'test-admin'},body:JSON.stringify({rotate})});
+ assert.equal((await checkin(request())).status,403);
+ const link=(await (await checkin(admin())).json()).url;token=new URL(link).hash.slice(1);assert.equal(token.length,64);assert.equal((await (await checkin(admin())).json()).url,link);
+ assert.equal((await checkin(request('GET',null,'','other'))).status,403);
+ let data=await (await checkin(request('GET',null,'Alex'))).json();assert.equal(data.total,2);assert.equal(data.rows.length,1);assert.equal(data.rows[0].name,'Matt Muskan');assert.equal(data.rows[0].guest,'Alex Muskan');assert.ok(!JSON.stringify(data).includes('private@example.com'));assert.equal(data.rows[0].phoneLast4,'1234');const id=data.rows[0].id;
+ await checkin(request('POST',{id,person:'guest',checked:true}));data=await (await checkin(request())).json();assert.equal(data.checked,1);assert.equal(data.rows[0].attendeeAt,'');
+ await checkin(request('POST',{id,person:'guest',checked:true}));assert.equal((await (await checkin(request())).json()).checked,1);
+ await checkin(request('POST',{id,person:'attendee',checked:true}));assert.equal((await (await checkin(request())).json()).checked,2);
+ const old=token;token=new URL((await (await checkin(admin(true))).json()).url).hash.slice(1);assert.notEqual(token,old);assert.equal((await (await checkin(request())).json()).checked,2);
+ await checkin(request('POST',{id,person:'guest',checked:false}));assert.equal((await (await checkin(request())).json()).checked,1);
+ assert.equal((await checkin(request('POST',{id:'fake',person:'attendee',checked:true}))).status,404);
+ token=old;assert.equal((await checkin(request())).status,403);
+ token=new URL((await (await checkin(admin(false,'other'))).json()).url).hash.slice(1);data=await (await checkin(request('GET',null,'','other'))).json();assert.equal(data.total,1);assert.equal(data.rows[0].name,'Outside Attendee');assert.equal((await checkin(request('POST',{id:data.rows[0].id,person:'guest',checked:true},'','other'))).status,404);
+ const unauthorized=new Request('https://example.com/check-in?slug=party&action=access',{method:'POST',body:'{}'});assert.equal((await checkin(unauthorized)).status,401);
+});
