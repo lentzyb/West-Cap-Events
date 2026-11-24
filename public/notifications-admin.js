@@ -24,7 +24,7 @@ async function showBonzoDiagnostic(id){
    body.replaceChildren(node('h3',result.candidate+' · '+result.event),node('p','Event ended: '+(result.eventEnd?new Date(result.eventEnd).toLocaleString():'Not configured')));
    if(!d.open)return;
   }while(cursor||result.indexPending||result.lookupPending);
-  if(result.apiCheck?.outcome==='no_match'){progress.textContent='No exact matching prospect is visible to this Bonzo API account. Check account access and contact details; outreach is unverified.';return;}
+  if(result.apiCheck?.outcome==='no_match'){progress.textContent='Not in Bonzo: no record with this email or phone exists under the recruiter or anywhere this Bonzo API account can see. The report and the recruiter reminder say so.';return;}
   const qualifies=all.some(message=>message.qualifies);
   progress.textContent=qualifies?'Qualifying post-event outreach found. A fresh report should show Contacted.':all.length?'Related messages found, but none qualify. See the reasons below.':'No saved message matches this candidate’s email or phone. The site has no matching message delivery to evaluate.';
   if(result.apiCheck)body.append(node('p','Fresh Bonzo API check: '+(result.apiCheck.reviewed||0)+' messages reviewed; outgoing: '+(result.apiCheck.directions?.outgoing||0)+', incoming: '+(result.apiCheck.directions?.incoming||0)+', other direction: '+(result.apiCheck.directions?.other||0)+'. Newest returned message: '+(result.apiCheck.newestAt?new Date(result.apiCheck.newestAt).toLocaleString():'None')+'.'+(result.apiCheck.ambiguous?' Unclassified post-event messages: '+result.apiCheck.ambiguous+'.':'')+(result.apiCheck.fields?.length?' Message fields returned by Bonzo: '+result.apiCheck.fields.join(', ')+'.':'')));
