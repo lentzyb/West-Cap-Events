@@ -1,3 +1,4 @@
+import {directionBasis} from './_bonzo-message.mjs';
 import crypto from 'node:crypto';
 import {store,listAll} from './_shared.mjs';
 import {apiEnabled,lookupKey,lookupStep,successfulStatus,messageDirection} from './_bonzo-api.mjs';
@@ -62,8 +63,8 @@ export async function saveBonzoMessage(payload){
  const key='bonzo-message:'+digest(`${p.business?.id||''}:${p.id}:${m.id}`),s=store();
  for(let attempt=0;attempt<5;attempt++){
   const old=await s.getWithMetadata(key,{type:'json'});
-  if(old&&(old.data.updated>updated||(old.data.updated===updated&&old.data.parserVersion===3))){await indexMessage(old.data);return {duplicate:true};}
-  const row={id:key,parserVersion:3,direction,prospectId:String(p.id),messageId:String(m.id),...contact,type:m.type,status:m.status,campaign:Boolean(m.campaign_id),sentAt:Math.max(created,scheduled),updated,accepted,rejectionReason,receivedAt:new Date().toISOString()};
+  if(old&&(old.data.updated>updated||(old.data.updated===updated&&old.data.parserVersion===4))){await indexMessage(old.data);return {duplicate:true};}
+  const row={id:key,parserVersion:4,direction,directionBasis:m._directionBasis==='sent-status'?'sent-status':directionBasis(m),prospectId:String(p.id),messageId:String(m.id),...contact,type:m.type,status:m.status,campaign:Boolean(m.campaign_id),sentAt:Math.max(created,scheduled),updated,accepted,rejectionReason,receivedAt:new Date().toISOString()};
   const result=await s.setJSON(key,row,old?{onlyIfMatch:old.etag}:{onlyIfNew:true});if(result.modified){await indexMessage(row);await s.setJSON('bonzo-hook:latest',{at:row.receivedAt});return {saved:true}}
  }
  throw Error('Concurrent update; retry delivery.');
@@ -74,7 +75,7 @@ export function outreachState(row,event,messages,now=Date.now()){
  const end=eventEnd(event);if(end===null)return {eligible:false,status:'Set event end date, time and time zone'};
  if(now<end)return {eligible:false,status:'Waiting for event to end'};
  const contact=messages.filter(m=>m.accepted&&m.sentAt>end&&m.sentAt<=now&&matchesContact(row,m)).sort((a,b)=>b.sentAt-a.sentAt)[0];
- if(!contact&&apiEnabled()){const check=messages.find(m=>m.lookupKey===lookupKey(row));if(check?.revision!==3||!check?.complete||check.outcome!=='found'||(check.boundary!==undefined&&check.boundary!==end)||Date.now()-Date.parse(check.checkedAt)>10*60000)return {eligible:false,status:check?.error||check?.outcome==='no_match'?'Bonzo check unverified: '+(check?.error||'No matching prospect visible to this API account'):'Bonzo verification pending',unverified:true};}
+ if(!contact&&apiEnabled()){const check=messages.find(m=>m.lookupKey===lookupKey(row));if(check?.revision!==4||!check?.complete||check.outcome!=='found'||(check.boundary!==undefined&&check.boundary!==end)||Date.now()-Date.parse(check.checkedAt)>10*60000)return {eligible:false,status:check?.error||check?.outcome==='no_match'?'Bonzo check unverified: '+(check?.error||'No matching prospect visible to this API account'):'Bonzo verification pending',unverified:true};}
  return contact?{eligible:false,status:'Contacted in Bonzo',contactedAt:new Date(contact.sentAt).toISOString(),contactType:contact.type,campaign:contact.campaign}:{eligible:true,status:'Needs post-event outreach (none recorded)'};
 }
 export async function bonzoMessages(){
@@ -110,7 +111,7 @@ export async function bonzoDiagnostic(id, cursor='') {
   const emailMatch=Boolean(email(row.email)&&email(row.email)===m.email),phoneMatch=Boolean(phone(row.phone).length>=10&&phone(row.phone)===m.phone);
   const conflict=Boolean((email(row.email)&&m.email&&!emailMatch)||(phone(row.phone).length>=10&&m.phone?.length>=10&&!phoneMatch));
   const reason=conflict?'Email or phone differs; contact match rejected':end===null?'Event end settings need correction':m.sentAt<=end?'Message was sent before the event ended':m.sentAt>Date.now()?'Message timestamp is in the future':!m.accepted?(m.rejectionReason||'Older saved validation result; a fresh API check is needed'):'Qualifying post-event outreach';
-  return {direction:m.direction||'not recorded',validationReason:m.rejectionReason||(!m.accepted?'Older saved validation result; a fresh API check is needed':''),messageId:m.messageId,prospectId:m.prospectId,type:m.type,status:m.status,emailMatch,phoneMatch,contactConflict:conflict,sentAt:Number.isFinite(m.sentAt)?new Date(m.sentAt).toISOString():'',receivedAt:m.receivedAt,qualifies:m.accepted&&!conflict&&end!==null&&m.sentAt>end&&m.sentAt<=Date.now(),reason};
+  return {direction:m.direction||'not recorded',directionBasis:m.directionBasis||'not recorded',validationReason:m.rejectionReason||(!m.accepted?'Older saved validation result; a fresh API check is needed':''),messageId:m.messageId,prospectId:m.prospectId,type:m.type,status:m.status,emailMatch,phoneMatch,contactConflict:conflict,sentAt:Number.isFinite(m.sentAt)?new Date(m.sentAt).toISOString():'',receivedAt:m.receivedAt,qualifies:m.accepted&&!conflict&&end!==null&&m.sentAt>end&&m.sentAt<=Date.now(),reason};
  });
  return {nextCursor,scanned:keys.length,candidate:[row.firstName,row.lastName].filter(Boolean).join(' '),event:row.eventName,eventEnd:end===null?'':new Date(end).toISOString(),apiCheck:apiCheck?{outcome:apiCheck.outcome,checkedAt:apiCheck.checkedAt,reviewed:apiCheck.reviewed,directions:apiCheck.directions,newestAt:apiCheck.newestAt}:null,status:state.status,relatedMessages:evidence.length,messages:evidence,lastRejected:lastRejected||null,explanation:!related.length?'No saved Bonzo message matches this candidate’s email or phone. Their presence in Bonzo alone does not prove a message delivery reached this site.':evidence.some(m=>m.qualifies)?'A qualifying post-event message is saved. A fresh report should show Contacted.':'Related messages were received but none satisfy all outreach rules. See the reasons below.'};
 }

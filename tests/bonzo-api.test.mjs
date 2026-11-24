@@ -101,3 +101,16 @@ test('unknown direction values cannot certify no outreach; report and reminders 
  const state=await finish();assert.equal(state.complete,false);assert.match(state.error,/direction=number:1/);assert.equal(outreachState(row,event,await bonzoMessages()).eligible,false);assert.equal(outreachState(row,event,await bonzoMessages()).unverified,true);
  const {reportSnapshot}=await import('../netlify/lib/_report.mjs');assert.equal((await reportSnapshot()).rows[0].category,'Unverified');
 });
+test('null direction with positive sent SMS evidence counts the follow-up, while delivered replies and answered calls do not',async()=>{
+ const {messageDirection}=await import('../netlify/lib/_bonzo-api.mjs');
+ assert.equal(messageDirection({...message,direction:null}),'outgoing');
+ for(const m of [{...message,direction:null,status:'delivered'},{...message,direction:null,status:'queued'},{...message,direction:null,status:'failed'},{...message,direction:null,type:'call',status:'answered'},{...message,direction:1},{...message,direction:'incoming'}])assert.notEqual(messageDirection(m),'outgoing');
+ globalThis.fetch=async url=>page(String(url).includes('/messages?')?[
+  {...message,id:'41',direction:null,status:'delivered'},
+  {...message,id:'42',direction:null,status:'sent'},
+  {...message,id:'43',direction:null,type:'call',status:'answered'}
+ ]:[prospect]);
+ let result;do{result=await bonzoDiagnostic('candidate');}while(result.lookupPending);
+ assert.ok(!result.lookupError);assert.equal(result.messages.filter(m=>m.qualifies).length,1);assert.equal(result.messages.find(m=>m.messageId==='42').directionBasis,'sent-status');
+ assert.equal(outreachState(row,event,await bonzoMessages()).status,'Contacted in Bonzo');
+});

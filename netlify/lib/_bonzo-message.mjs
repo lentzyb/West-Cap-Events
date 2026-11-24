@@ -14,7 +14,13 @@ export function messageDirection(message){
   const value=flag(message[key]);if(value===null)continue;
   const outgoing=key.includes('outgoing')?value:!value;signals.push(outgoing?'outgoing':'incoming');
  }
- return signals.length&&new Set(signals).size===1?signals[0]:'unknown';
+ if(signals.length)return new Set(signals).size===1?signals[0]:'unknown';
+ // Bonzo can omit direction in API responses. Its explicit 'sent' state is
+ // positive send evidence for written/voicemail messages. 'Delivered' is
+ // deliberately excluded: Bonzo also uses it for incoming messages.
+ const missingDirection=message.direction==null&&message.message_direction==null&&['is_outgoing','outgoing','is_incoming','incoming'].every(key=>message[key]==null);
+ if(missingDirection&&message.status==='sent'&&!message.error_message&&['sms','email','voicemail'].includes(message.type))return 'outgoing';
+ return 'unknown';
 }
 // Only directional metadata, never message text, addresses, tokens or the full API payload.
 export function directionDescription(message){
@@ -27,3 +33,5 @@ export function directionDescription(message){
  };
  return ['direction','message_direction','is_outgoing','outgoing','is_incoming','incoming'].filter(key=>Object.hasOwn(message,key)).map(key=>key+'='+describe(message[key])).join(', ')||'direction field missing';
 }
+
+export const directionBasis=message=>message.direction==null&&message.message_direction==null&&messageDirection(message)==='outgoing'&&['is_outgoing','outgoing','is_incoming','incoming'].every(key=>message[key]==null)?'sent-status':'explicit-direction';

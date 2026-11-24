@@ -52,7 +52,7 @@ test('background index resumes, avoids concurrent work and uses current message 
 test('fresh payload revalidates legacy rejected metadata at the same provider timestamp',async()=>{
  const {saveBonzoMessage}=await import('../netlify/lib/_bonzo.mjs');await saveBonzoMessage(payload());
  const key=[...testDB.keys()].find(key=>key.startsWith('bonzo-message:'));const old=testDB.get(key);delete old.parserVersion;delete old.rejectionReason;old.accepted=false;testDB.set(key,old);
- await saveBonzoMessage(payload());assert.equal(testDB.get(key).accepted,true);assert.equal(testDB.get(key).direction,'outgoing');assert.equal(testDB.get(key).parserVersion,3);
+ await saveBonzoMessage(payload());assert.equal(testDB.get(key).accepted,true);assert.equal(testDB.get(key).direction,'outgoing');assert.equal(testDB.get(key).parserVersion,4);
 });
 test('answered outgoing calls count as contact only after the event',async()=>{
  const {saveBonzoMessage}=await import('../netlify/lib/_bonzo.mjs');await saveBonzoMessage(payload({type:'call',status:'answered'}));const messages=await bonzoMessages();assert.equal(outreachState(candidate,event,messages).status,'Contacted in Bonzo');
