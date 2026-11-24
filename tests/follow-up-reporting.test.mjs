@@ -76,7 +76,7 @@ test('messages Bonzo returns without a direction are classified by exact sender 
  const saved=[...testDB.values()].find(value=>value?.messageId==='1');assert.equal(saved.directionBasis,'contact-match');assert.equal(saved.accepted,true);
  const check=testDB.get(lookupKey(testDB.get('followup:c3')));assert.deepEqual(check.fieldNames,['created_at','id','prospect_id','status','type','updated_at']);
 });
-test('a candidate missing from the recruiter\'s own records is found under the team, and a true miss is reported as Not found in Bonzo',async()=>{
+test('a candidate missing from the recruiter\'s own records is found under the team, and a true miss is reported as Not in Bonzo',async()=>{
  seed(2);const scoped=[];
  globalThis.fetch=async(url,options)=>{url=String(url);if(url.includes('/messages?'))return page([]);const owner=options.headers['On-Behalf-Of'];scoped.push(owner?'owner':'team');
   // The recruiter owns neither record; a teammate owns candidate 0, nobody has candidate 1.
@@ -84,9 +84,9 @@ test('a candidate missing from the recruiter\'s own records is found under the t
  await refresh();const rows=Object.fromEntries((await reportSnapshot()).rows.map(row=>[row.lastName,row]));
  assert.ok(scoped.includes('owner')&&scoped.includes('team'));
  assert.equal(rows['000'].category,'Needs outreach');
- assert.equal(rows['001'].category,'Not found in Bonzo');assert.match(rows['001'].status,/^Not found in Bonzo/);
- assert.equal(outreachState(testDB.get('followup:c1'),event,await bonzoMessages()).eligible,false);
- assert.equal((await reportSnapshot()).counts['Not found in Bonzo'],1);
+ assert.equal(rows['001'].category,'Not in Bonzo');assert.match(rows['001'].status,/^Not in Bonzo/);
+ const state=outreachState(testDB.get('followup:c1'),event,await bonzoMessages());assert.equal(state.eligible,true);assert.equal(state.notInBonzo,true);
+ assert.equal((await reportSnapshot()).counts['Not in Bonzo'],1);
 });
 test('a remembered or linked Bonzo record that no longer exists falls back to search instead of failing the check',async()=>{
  seed(1);const row=testDB.get('followup:c0');
@@ -100,4 +100,16 @@ test('an unclassified post-event message reports its type, status and the field 
  seed(1);globalThis.fetch=async url=>{url=String(url);return url.includes('/messages?')?page([{id:9,prospect_id:'1000',type:'sms',status:'delivered',direction:null,body:'private text',user_id:4,created_at:'2026-01-02T13:00:00Z',updated_at:'2026-01-02T13:00:00Z'}]):page(prospectFor(url));};
  await refresh();const status=(await reportSnapshot()).rows[0].status;
  assert.match(status,/direction=null, type=sms, status=delivered/);assert.match(status,/Fields Bonzo returned: body created_at direction id prospect_id status type updated_at user_id/);assert.ok(!status.includes('private text'));
+});
+test('the recruiter reminder lists a candidate with no Bonzo record and labels them Not in Bonzo',async()=>{
+ const {recruiterEmailBody,candidateEligibility}=await import('../netlify/lib/_notifications.mjs');
+ seed(2);globalThis.fetch=async(url,options)=>{url=String(url);if(url.includes('/messages?'))return page([]);return page(decodeURIComponent(url).includes('c0@example.com')?prospectFor(url):[]);};
+ process.env.NOTIFICATION_SECRET='x'.repeat(40);process.env.URL='https://example.netlify.app';
+ try{
+  await refresh();const eligible=await candidateEligibility();assert.equal(eligible.counts.eligible,2);assert.equal(eligible.counts.unverified,0);
+  const messages=await bonzoMessages();const rows=eligible.rows.map(row=>({...row,notInBonzo:outreachState(row,event,messages).notInBonzo===true}));
+  const mail=recruiterEmailBody({id:'r',name:'Recruiter'},rows,'daily');
+  assert.match(mail.html,/Not in Bonzo/);assert.match(mail.html,/1 not in Bonzo/);assert.match(mail.text,/Status: Not in Bonzo/);assert.match(mail.text,/Status: Follow-up needed/);
+  assert.match(mail.text,/1 of them is marked Not in Bonzo/);
+ }finally{delete process.env.NOTIFICATION_SECRET;delete process.env.URL;}
 });

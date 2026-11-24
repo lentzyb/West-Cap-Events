@@ -19,8 +19,8 @@ test('targeted diagnostic bypasses global indexing, verifies exact prospect and 
  const messages=await bonzoMessages();assert.equal(outreachState(row,event,messages).status,'Contacted in Bonzo');
  assert.ok(!JSON.stringify([...testDB.values()]).includes('private message'));assert.ok(!JSON.stringify([...testDB.values()]).includes('private-token'));
 });
-test('no visible match, conflicting contact and API errors hold reminders rather than claiming no outreach',async()=>{
- globalThis.fetch=async()=>page([{...prospect,email:'other@example.com'}]);let state=await finish();assert.equal(state.outcome,'no_match');assert.equal(outreachState(row,event,await bonzoMessages()).eligible,false);
+test('a completed search with no match reports Not in Bonzo, while API errors hold reminders rather than claiming no outreach',async()=>{
+ globalThis.fetch=async()=>page([{...prospect,email:'other@example.com'}]);let state=await finish();assert.equal(state.outcome,'no_match');const missing=outreachState(row,event,await bonzoMessages());assert.equal(missing.status,'Not in Bonzo');assert.equal(missing.notInBonzo,true);assert.equal(missing.eligible,true);
  testDB.delete(lookupKey(row));globalThis.fetch=async()=>new Response('secret error',{status:403});state=await finish();assert.match(state.error,/permission/);assert.ok(!JSON.stringify(state).includes('secret error'));assert.equal(outreachState(row,event,await bonzoMessages()).unverified,true);
 });
 test('pagination stays on validated prospect, rejects conflicting message IDs and ignores incoming messages',async()=>{
