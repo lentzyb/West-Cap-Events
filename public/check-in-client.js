@@ -1,0 +1,31 @@
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id),offline=window.WclOffline,slug=new URLSearchParams(location.search).get('event')||'',storageKey='checkin-code:'+slug;
+let token=location.hash.slice(1)||sessionStorage.getItem(storageKey)||'',generation=0,timer,busy=false,rosterData;
+if(token){sessionStorage.setItem(storageKey,token);history.replaceState(null,'',location.pathname+location.search);}
+const endpoint='/.netlify/functions/check-in?slug='+encodeURIComponent(slug),node=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
+async function request(options={},full=false){let response;try{response=await fetch(endpoint+(options.method?'':full?'&offline=1':'&q='+encodeURIComponent($('search').value)),{...options,headers:{'x-checkin-code':token,'content-type':'application/json'},cache:'no-store',signal:AbortSignal.timeout(25000)});}catch{throw Error('Connection unavailable.');}const data=await response.json().catch(()=>({error:'The server did not return attendance data.'}));if(!response.ok||data.error){const error=Error(data.error||'Request failed.');error.status=response.status;throw error;}return data;}
+const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+async function displayData(data,local){data=structuredClone(data);const pending=(await offline.jobs()).filter(j=>j.slug===slug);
+ if(local){const ids=new Set(data.rows.map(r=>r.id));for(const row of await offline.localRows(slug))if(!ids.has(row.id)){data.rows.push(row);ids.add(row.id);}for(const job of pending.filter(j=>j.type==='checkin'&&!j.needsReview)){const row=data.rows.find(r=>r.id===job.payload.id);if(row){row[job.payload.person+'At']=job.payload.checked?job.createdAt:'';row[job.payload.person+'Version']=job.id;row.localPending=true;}}
+ const all=data.rows;data.total=all.reduce((sum,r)=>sum+1+!!r.guest,0);data.checked=all.reduce((sum,r)=>sum+!!r.attendeeAt+!!r.guestAt,0);data.remaining=data.total-data.checked;const words=normalize($('search').value).split(' ').filter(Boolean);data.rows=all.filter(r=>words.every(word=>normalize(r.name+' '+r.guest).includes(word))).sort((a,b)=>a.name.localeCompare(b.name));data.matched=data.rows.length;data.rows=data.rows.slice(0,50);}
+ $('title').textContent=data.event.name;$('eventDetails').textContent=[data.event.date,data.event.location].filter(Boolean).join(' · ');$('counts').replaceChildren(...[['Registered people',data.total],['Checked in',data.checked],['Still expected',data.remaining]].map(([label,value])=>{const box=node('div');box.className='metric';box.append(node('strong',String(value)),node('span',label));return box;}));$('matchCount').textContent=data.matched>50?'Showing 50 of '+data.matched+' matches. Narrow your search.':data.matched+' matching registration'+(data.matched===1?'':'s');$('results').replaceChildren(...data.rows.map(row=>{const card=node('article');card.append(node('h2',row.name));if(row.phoneLast4)card.append(node('small','Phone ending '+row.phoneLast4));if(row.localPending)card.append(node('p','Saved on this device; awaiting sync.'));card.append(person(row,'attendee',row.name,row.attendeeAt));if(row.guest)card.append(person(row,'guest',row.guest,row.guestAt));return card;}));
+}
+function person(row,kind,name,at){const line=node('div');line.className='person';const info=node('div');info.append(node('strong',name),node('small',kind==='guest'?'Plus-one for '+row.name:'Registered attendee'));if(at){const status=node('small','Checked in · '+new Date(at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));status.className='done';info.append(status);}const button=node('button',at?'Undo check-in':'Check in');button.className=at?'secondary':'';button.onclick=async()=>{if(busy)return;if(at&&!confirm('Undo check-in for '+name+'?'))return;busy=true;generation++;button.disabled=true;try{
+ const prepared=await offline.prepared('checkin',slug),payload={id:row.id,person:kind,checked:!at};
+ if(prepared){payload.operationId=crypto.randomUUID();payload.baseVersion=row[kind+'Version']||'';await offline.enqueue('checkin',slug,payload,{token});$('message').textContent='Check-in saved on this device. It will sync when connected.';offline.sync();}
+ else await request({method:'POST',body:JSON.stringify(payload)});
+ busy=false;await load();
+ }catch(error){$('message').textContent=error.message;button.disabled=false;}finally{busy=false;}};line.append(info,button);return line;}
+async function load(){if(busy)return;const current=++generation;$('message').textContent='Loading attendance…';try{const saved=await offline.prepared('checkin',slug);let data,local=!!saved;
+ if(saved&&navigator.onLine===false)data=saved.data;
+ else try{data=await request({},!!saved);if(saved)await offline.set('prepared:checkin:'+slug,{...saved,data,token});}
+ catch(error){if(!saved||error.status>=400&&error.status<500)throw error;data=saved.data;}
+ if(current!==generation)return;rosterData=data;await displayData(data,local);$('message').textContent=saved?(navigator.onLine===false?'Offline attendance: includes changes saved on this device only.':'Attendance loaded. Unsynced entries remain marked until confirmed.'):(data.rows.length?'Attendance updated.':'No matching attendees.');
+ }catch(error){if(current===generation)$('message').textContent=error.message;}}
+async function start(){const saved=await offline.prepared('checkin',slug);if(!token&&saved)token=saved.token||'';if(!token||!slug){$('message').textContent='Open the private check-in link provided by the event organizer.';$('refresh').disabled=true;$('search').disabled=true;return;}
+ await offline.panel($('offlineTools'),'checkin',slug,async()=>{const data=await request({},true);await offline.prepare('checkin',slug,{data,token});await load();});
+ $('search').oninput=()=>{generation++;clearTimeout(timer);timer=setTimeout(load,250);};$('refresh').onclick=()=>{offline.sync();load();};window.addEventListener('online',load);window.addEventListener('wcl-offline-change',async()=>{if(rosterData&&!busy&&await offline.prepared('checkin',slug))displayData(rosterData,true);});await load();offline.sync();setInterval(()=>{if(!document.hidden&&!busy)load();},30000);
+}
+start().catch(error=>{$('message').textContent=error.message;});
+})();

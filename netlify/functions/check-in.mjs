@@ -43,16 +43,28 @@ export default async req => {
       if(!row||!['attendee','guest'].includes(body.person)||(body.person==='guest'&&!row.guest))return json({error:'Attendee not found. Refresh and search again.'},404);
       if(typeof body.checked!=='boolean')return json({error:'Choose a check-in status.'},400);
       const key=`checkin:${slug}:${row.id}:${body.person}`;
-      if(body.checked)await db.setJSON(key,{id:row.id,person:body.person,at:new Date().toISOString()},{onlyIfNew:true});
+      if(body.operationId){
+        if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(body.operationId)||typeof body.baseVersion!=='string')return json({error:'Invalid offline check-in operation.'},400);
+        for(let attempt=0;attempt<3;attempt++){
+          const current=await db.getWithMetadata(key,{type:'json'}),value=current?.data;
+          if(value?.version===body.operationId)return json({ok:true});
+          const alreadyChecked=!!value&&value.checked!==false;
+          if(body.checked&&alreadyChecked)return json({ok:true});
+          if((value?.version||value?.at||'')!==body.baseVersion)return json({error:'Attendance changed on another device. Refresh online and review this saved change.'},409);
+          const saved=await db.setJSON(key,{id:row.id,person:body.person,checked:body.checked,version:body.operationId,at:new Date().toISOString()},current?{onlyIfMatch:current.etag}:{onlyIfNew:true});if(saved.modified)return json({ok:true});
+        }
+        return json({error:'Attendance is being updated. Retry sync shortly.'},409);
+      }
+      if(body.checked){const current=await db.getWithMetadata(key,{type:'json'});if(!current||current.data.checked===false){const result=await db.setJSON(key,{id:row.id,person:body.person,at:new Date().toISOString()},current?{onlyIfMatch:current.etag}:{onlyIfNew:true});if(!result.modified)return json({error:'Attendance changed. Refresh and try again.'},409);}}
       else await db.delete(key);
       return json({ok:true});
     }
-    const records=await listAll(`checkin:${slug}:`),lookup=new Map(records.map(record=>[`${record.id}:${record.person}`,record.at]));
+    const records=await listAll(`checkin:${slug}:`),lookup=new Map(records.map(record=>[`${record.id}:${record.person}`,record]));
     const total=rows.reduce((sum,row)=>sum+1+Boolean(row.guest),0);
     let checked=0;
-    for(const row of rows){row.attendeeAt=lookup.get(row.id+':attendee')||'';row.guestAt=row.guest?lookup.get(row.id+':guest')||'':'';checked+=Boolean(row.attendeeAt)+Boolean(row.guestAt);}
+    for(const row of rows){const attendee=lookup.get(row.id+':attendee'),guest=lookup.get(row.id+':guest');row.attendeeAt=attendee&&attendee.checked!==false?attendee.at:'';row.guestAt=row.guest&&guest&&guest.checked!==false?guest.at:'';row.attendeeVersion=attendee?.version||attendee?.at||'';row.guestVersion=guest?.version||guest?.at||'';checked+=Boolean(row.attendeeAt)+Boolean(row.guestAt);}
     const query=normalize(url.searchParams.get('q')).split(' ').filter(Boolean);
     const matches=rows.filter(row=>query.every(word=>normalize(row.name+' '+row.guest).includes(word))).sort((a,b)=>a.name.localeCompare(b.name));
-    return json({event:{name:event.name,date:event.date,location:event.location},total,checked,remaining:total-checked,matched:matches.length,rows:matches.slice(0,50)});
+    return json({event:{name:event.name,date:event.date,location:event.location},total,checked,remaining:total-checked,matched:matches.length,rows:url.searchParams.get('offline')==='1'?matches:matches.slice(0,50)});
   }catch(error){console.error('Check-in request failed',error.message);return json({error:'Unable to update check-in. Refresh to verify attendance before trying again.'},500);}
 };
