@@ -25,8 +25,14 @@ Upload the extracted contents to the same GitHub repository and let Netlify publ
 The first report on the fixed code showed 41 Unverified rows with real reasons: 36 "no matching prospect", 4 unclassified direction, 1 HTTP 404.
 
 1. **Search covers the whole team, not only the assigned recruiter.** The search ran against the recruiter's own Bonzo records and stopped there when that worked, so a candidate held under a teammate (an import or a campaign) was reported as not visible. It now searches the recruiter's records and then every record the API account can see.
-2. **"Not found in Bonzo" is its own report category.** A candidate with no Bonzo record under the recruiter or the team is no longer mixed in with failed checks. Reminders for these are still held, as before.
+2. **"Not in Bonzo" is its own report category.** A candidate with no Bonzo record under the recruiter or the team is no longer mixed in with failed checks.
 3. **A deleted or merged Bonzo record no longer fails the check.** A remembered or manually linked prospect ID that returns 404 is skipped and the candidate is searched for again.
 4. **Unclassified messages now say what they are.** The status shows the message type and status and lists the field names Bonzo returned (names only), so the direction rule can be finished from the next CSV export.
 
 123 automated tests and the build passed.
+
+## Third update: Not in Bonzo goes to recruiters
+
+A candidate with no Bonzo record is now reported as **Not in Bonzo** in the daily outreach report and in the recruiter reminder email, instead of being held as Unverified. The recruiter email marks each such candidate "Not in Bonzo" with the instruction to add them and follow up, and the summary line counts them. Checks that fail (errors, rate limits, unclassified messages) are still held as Unverified.
+
+124 automated tests and the build passed.
