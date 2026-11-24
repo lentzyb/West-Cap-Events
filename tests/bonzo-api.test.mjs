@@ -21,7 +21,7 @@ test('targeted diagnostic bypasses global indexing, verifies exact prospect and 
 });
 test('no visible match, conflicting contact and API errors hold reminders rather than claiming no outreach',async()=>{
  globalThis.fetch=async()=>page([{...prospect,email:'other@example.com'}]);let state=await finish();assert.equal(state.outcome,'no_match');assert.equal(outreachState(row,event,await bonzoMessages()).eligible,false);
- testDB.delete(lookupKey(row));globalThis.fetch=async()=>new Response('secret error',{status:403});state=await lookupStep(row,saveBonzoMessage);assert.match(state.error,/permission/);assert.ok(!JSON.stringify(state).includes('secret error'));assert.equal(outreachState(row,event,await bonzoMessages()).unverified,true);
+ testDB.delete(lookupKey(row));globalThis.fetch=async()=>new Response('secret error',{status:403});state=await finish();assert.match(state.error,/permission/);assert.ok(!JSON.stringify(state).includes('secret error'));assert.equal(outreachState(row,event,await bonzoMessages()).unverified,true);
 });
 test('pagination stays on validated prospect, rejects conflicting message IDs and ignores incoming messages',async()=>{
  let messagePages=0;globalThis.fetch=async url=>{if(!String(url).includes('/messages?'))return page([prospect]);messagePages++;return messagePages===1?page([{...message,direction:'incoming'}],'https://evil.example/?token=steal'):page([{...message,prospect_id:'999'}]);};
@@ -67,8 +67,8 @@ test('diagnostics preserve safe HTTP, timeout, JSON and timestamp failure reason
  testDB.delete(lookupKey(row));globalThis.fetch=async url=>page(String(url).includes('/messages?')?[{...message,created_at:'2026-01-02 13:00:00'}]:[prospect]);const state=await finish();assert.match(state.error,/timestamp/);assert.match(state.error,/Stage: candidate messages/);
 });
 
-test('candidate search includes permitted team prospects with bounded pages and deferred counts',async()=>{
- globalThis.fetch=async url=>{const u=new URL(url);assert.equal(u.searchParams.get('show_all'),'1');assert.equal(u.searchParams.get('defer_count'),'1');assert.equal(u.searchParams.get('exact_count'),'0');assert.equal(u.searchParams.get('per_page'),'25');return page([prospect]);};
+test('candidate search scopes to the configured recruiter with bounded pages and deferred counts',async()=>{
+ globalThis.fetch=async (url,options)=>{const u=new URL(url);assert.equal(options.headers['On-Behalf-Of'],'recruiter@example.com');assert.equal(u.searchParams.has('show_all'),false);assert.equal(u.searchParams.get('defer_count'),'1');assert.equal(u.searchParams.get('exact_count'),'0');assert.equal(u.searchParams.get('per_page'),'25');return page([prospect]);};
  assert.equal((await lookupStep(row,saveBonzoMessage)).error,undefined);
 });
 test('direct prospect link validates the exact record and bypasses search on subsequent checks',async()=>{
@@ -121,11 +121,13 @@ test('automatic lookup reuses contact-index prospect IDs after fresh identity va
  assert.equal(result.messages.some(m=>m.qualifies),true);assert.equal(calls.length,2);assert.ok(calls[0].endsWith('/prospects/12'));assert.ok(calls[1].includes('/prospects/12/messages?'));
 });
 test('stale indexed identity is rejected and falls back to permitted exact search',async()=>{
+ testDB.delete('recruiter:recruiter');
  await saveBonzoMessage({event:'messages.outgoing.updated',prospect,additional:{message:{...message,created_at:'2025-01-01T00:00:00Z',updated_at:'2025-01-01T00:00:00Z'}}});
  calls=[];globalThis.fetch=async url=>{calls.push(String(url));assert.ok(!String(url).includes('/messages?'));return String(url).includes('/prospects/12')?Response.json({data:{...prospect,email:'other@example.com',phone:'5555555555'}}):page([]);};
  const result=await finish();assert.equal(result.outcome,'no_match');assert.equal(calls.filter(u=>u.includes('show_all=1')).length,2);
 });
 test('team-wide search discovers a prospect omitted from the default list and invalidates old no-match cache',async()=>{
+ testDB.delete('recruiter:recruiter');
  testDB.set(lookupKey(row),{lookupKey:lookupKey(row),revision:4,complete:true,outcome:'no_match',checkedAt:new Date().toISOString()});
  globalThis.fetch=async url=>{calls.push(String(url));const u=new URL(url);if(u.pathname.endsWith('/messages'))return page([message]);assert.equal(u.searchParams.get('show_all'),'1');assert.equal(u.searchParams.get('per_page'),'25');return page([prospect]);};
  let result;do{result=await bonzoDiagnostic('candidate');}while(result.lookupPending);assert.equal(result.messages.some(m=>m.qualifies),true);assert.equal(calls.filter(u=>u.includes('/messages?')).length,1);
@@ -133,4 +135,15 @@ test('team-wide search discovers a prospect omitted from the default list and in
 test('one-candidate search status does not load unrelated follow-ups or lookup records',async()=>{
  testDB.set('followup:unrelated',()=>{});testDB.set('bonzo-lookup:unrelated',()=>{});
  const messages=await bonzoMessages([row]);assert.deepEqual(messages,[]);
+});
+test('denied recruiter scope falls back without global cooldown or sending messages',async()=>{
+ let denied=0;globalThis.fetch=async(url,options)=>{calls.push(String(url));if(options.headers['On-Behalf-Of']){denied++;return new Response(null,{status:403});}return page(String(url).includes('/messages?')?[message]:[prospect]);};
+ const state=await finish();assert.equal(state.outcome,'found');assert.equal(denied,1);assert.equal(testDB.has('bonzo-api:cooldown'),false);assert.equal(state.ownerScopeDenied,true);
+});
+test('background refresh checkpoints unfinished candidates and does not overlap another refresh',async()=>{
+ for(let i=0;i<6;i++)testDB.set('followup:'+i,{...row,id:String(i),email:`person${i}@example.com`,phone:'',recruiterId:''});testDB.delete('followup:candidate');
+ const now=Date.now;let clock=now();Date.now=()=>clock;
+ try{globalThis.fetch=async()=>{clock+=1000;return page([]);};const result=await refreshEventCandidates(saveBonzoMessage,eventEnd,[],()=>({}),{budgetMs:500});assert.equal(result.checked,3);assert.equal(result.remaining,3);assert.equal(testDB.get('bonzo-refresh:latest').remaining,3);
+ testDB.set('bonzo-refresh:lease',{owner:'other',expiresAt:clock+10000});assert.equal((await refreshEventCandidates(saveBonzoMessage,eventEnd)).busy,true);
+ }finally{Date.now=now;}
 });
