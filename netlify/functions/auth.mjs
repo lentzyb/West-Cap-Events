@@ -1,4 +1,4 @@
-import { json, requireAdmin, createAdminSessionCookie } from "./_shared.mjs";
+import { json, requireAdmin, createAdminSessionCookie } from "../lib/_shared.mjs";
 
 export default async req => {
   if (req.method !== "POST") {

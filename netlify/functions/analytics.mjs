@@ -1,5 +1,5 @@
-import { json, requireAdmin, parseJSON, listAll, store } from "./_shared.mjs";
-import { getConversionData } from './_monday.mjs';
+import { json, requireAdmin, parseJSON, listAll, store } from "../lib/_shared.mjs";
+import { getConversionData } from '../lib/_monday.mjs';
 const normEmail=v=>String(v||'').trim().toLowerCase();
 const normPhone=v=>{let d=String(v||'').replace(/\D/g,'');if(d.length===11&&d.startsWith('1'))d=d.slice(1);return d;};
 const normName=v=>String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();

@@ -1,7 +1,7 @@
-import {json,requireAdmin,parseJSON,listAll,store,clean,slugify,readEvent} from './_shared.mjs';
+import {json,requireAdmin,parseJSON,listAll,store,clean,slugify,readEvent} from '../lib/_shared.mjs';
 import * as XLSX from 'xlsx';
 import crypto from 'node:crypto';
-import {hash,normEmail,normPhone,normName,resolveRecruiter,queueCandidate,kickWorker} from './_notifications.mjs';
+import {hash,normEmail,normPhone,normName,resolveRecruiter,queueCandidate,kickWorker} from '../lib/_notifications.mjs';
 const normHeader=v=>String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const aliases={first:['first name','firstname','first','given name'],last:['last name','lastname','last','surname','family name'],name:['name','full name','candidate name','attendee name'],email:['email','email address','personal email','e mail'],phone:['phone','phone number','cell phone','mobile','mobile phone','telephone'],nmls:['nmls','nmls id','nmls number','nmls #'],recruiter:['recruiter','recruiter name','assigned recruiter','referred by','team member','recruiter email']};
 const firstValue=(row,names)=>{for(const alias of names){const entry=Object.entries(row).find(([key,value])=>normHeader(key)===alias&&String(value??'').trim());if(entry)return String(entry[1]).trim()}return ''};

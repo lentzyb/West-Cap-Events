@@ -16,7 +16,7 @@ test('delivery status loads without scanning candidate or Bonzo message bodies',
  assert.equal(response.status,200);const result=await response.json();assert.deepEqual(result.rows,[]);assert.equal(result.requests.length,1);assert.equal(result.worker.status,'failed');
 });
 test('bulk candidate recovery reuses a snapshot and preserves registration priority',async()=>{
- const {queueCandidate}=await import('../netlify/functions/_notifications.mjs');const known=[];
+ const {queueCandidate}=await import('../netlify/lib/_notifications.mjs');const known=[];
  const candidate={id:'first',eventSlug:'test',eventName:'Test',recruiterId:'recruiter',email:'person@example.com',firstName:'Person',sourceType:'registration'};
  await queueCandidate(candidate,known);assert.equal(known.length,1);
  globalThis.testDB.set('followup:unreadable',()=>{});

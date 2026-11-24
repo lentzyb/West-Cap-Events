@@ -1,4 +1,4 @@
-import { json, parseJSON, clean, registrationPrefix, listAll, store } from "./_shared.mjs";
+import { json, parseJSON, clean, registrationPrefix, listAll, store } from "../lib/_shared.mjs";
 
 const fieldFor = { shown: "shownAt", event_type_viewed: "eventTypeViewedAt", time_selected: "timeSelectedAt", scheduled: "scheduledAt" };
 export default async req => {

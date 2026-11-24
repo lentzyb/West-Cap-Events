@@ -1,4 +1,4 @@
-import {test,beforeEach} from 'node:test';import assert from 'node:assert/strict';import media from '../netlify/functions/media.mjs';import {mediaUrl,normalizePage} from '../netlify/functions/_event-page.mjs';
+import {test,beforeEach} from 'node:test';import assert from 'node:assert/strict';import media from '../netlify/functions/media.mjs';import {mediaUrl,normalizePage} from '../netlify/lib/_event-page.mjs';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jc1kAAAAASUVORK5CYII=','base64');
 beforeEach(()=>{globalThis.testDB=new Map();globalThis.testMetadata=new Map();process.env.ADMIN_PASSWORD='test-admin'});
 const upload=(body=png,type='image/png',password='test-admin',extra={})=>media(new Request('https://event.example/media',{method:'POST',headers:{'content-type':type,'x-admin-password':password,...extra},body}));

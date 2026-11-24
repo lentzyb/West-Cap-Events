@@ -1,7 +1,7 @@
 import {test,beforeEach,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
-import {lookupStep,lookupKey,refreshEventCandidates} from '../netlify/functions/_bonzo-api.mjs';
-import {bonzoDiagnostic,bonzoMessages,outreachState,eventEnd,saveBonzoMessage} from '../netlify/functions/_bonzo.mjs';
+import {lookupStep,lookupKey,refreshEventCandidates} from '../netlify/lib/_bonzo-api.mjs';
+import {bonzoDiagnostic,bonzoMessages,outreachState,eventEnd,saveBonzoMessage} from '../netlify/lib/_bonzo.mjs';
 const row={id:'candidate',email:'person@example.com',phone:'3135551212',eventSlug:'event',recruiterId:'recruiter'};
 const event={slug:'event',date:'2026-01-01',endTime:'12:00',timeZone:'UTC'};
 const prospect={id:12,email:'PERSON@example.com',phone:'+13135551212',business:{id:2}};
@@ -42,7 +42,7 @@ test('a broad search never fetches unrelated message histories and remains unver
  const state=await finish();assert.match(state.error,/too broad/);assert.equal(outreachState(row,event,await bonzoMessages()).eligible,false);
 });
 test('API queued, failed, incoming and pre-event activity cannot qualify as contact',async()=>{
- const {reportSnapshot}=await import('../netlify/functions/_report.mjs');
+ const {reportSnapshot}=await import('../netlify/lib/_report.mjs');
  globalThis.fetch=async url=>page(String(url).includes('/messages?')?[
   {...message,id:'1',status:'queued'},
   {...message,id:'2',status:'failed',error_message:'failed'},
@@ -72,14 +72,14 @@ test('candidate search uses bounded pagination and deferred counts, never show_a
  assert.equal((await lookupStep(row,saveBonzoMessage)).error,undefined);
 });
 test('direct prospect link validates the exact record and bypasses search on subsequent checks',async()=>{
- const {verifyDirectProspect,prospectId}=await import('../netlify/functions/_bonzo-api.mjs');
+ const {verifyDirectProspect,prospectId}=await import('../netlify/lib/_bonzo-api.mjs');
  assert.equal(prospectId('https://platform.getbonzo.com/prospect/12'),'12');assert.throws(()=>prospectId('https://evil.example/prospect/12'));
  globalThis.fetch=async url=>{calls.push(String(url));assert.ok(!String(url).includes('search='));return String(url).includes('/messages?')?page([message]):Response.json({data:prospect,last_subject:''});};
  await verifyDirectProspect(row,'https://platform.getbonzo.com/prospect/12');let result;do{result=await bonzoDiagnostic('candidate');}while(result.lookupPending);
  assert.equal(result.messages[0].qualifies,true);assert.ok(calls.some(url=>url.endsWith('/prospects/12')));
 });
 test('direct prospect access denial and conflicting contact cannot save a link or fetch messages',async()=>{
- const {verifyDirectProspect}=await import('../netlify/functions/_bonzo-api.mjs');
+ const {verifyDirectProspect}=await import('../netlify/lib/_bonzo-api.mjs');
  globalThis.fetch=async()=>new Response('',{status:403});await assert.rejects(()=>verifyDirectProspect(row,'12'),/permission/);assert.ok(![...testDB.keys()].some(k=>k.startsWith('bonzo-direct:')));
  testDB.delete('bonzo-api:cooldown');globalThis.fetch=async()=>Response.json({data:{...prospect,email:'wrong@example.com'}});await assert.rejects(()=>verifyDirectProspect(row,'12'),/does not exactly match/);assert.ok(![...testDB.keys()].some(k=>k.startsWith('bonzo-direct:')));
 });

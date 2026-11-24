@@ -9,7 +9,7 @@ import {
   readRecruiter,
   listAll,
   store
-} from "./_shared.mjs";
+} from "../lib/_shared.mjs";
 
 const normalizeUrl = raw => {
   const value = clean(raw, 500);

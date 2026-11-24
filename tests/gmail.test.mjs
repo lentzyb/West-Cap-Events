@@ -1,6 +1,6 @@
 import {test,beforeEach} from 'node:test';import assert from 'node:assert/strict';
-import {emailConfig,emailReadiness,publicEmailSettings,sendEmail,sendSelfTest} from '../netlify/functions/_email.mjs';
-import {queueCandidate,runNotifications,readiness} from '../netlify/functions/_notifications.mjs';
+import {emailConfig,emailReadiness,publicEmailSettings,sendEmail,sendSelfTest} from '../netlify/lib/_email.mjs';
+import {queueCandidate,runNotifications,readiness} from '../netlify/lib/_notifications.mjs';
 import notifications from '../netlify/functions/notifications.mjs';
 let sent;
 beforeEach(()=>{

@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { json, requireAdmin, slugify, readEvent } from "./_shared.mjs";
+import { json, requireAdmin, slugify, readEvent } from "../lib/_shared.mjs";
 
 export default async req => {
   try {

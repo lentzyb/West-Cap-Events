@@ -1,4 +1,4 @@
-import { json, requireAdmin, slugify, registrationPrefix, readEvent, listAll } from "./_shared.mjs";
+import { json, requireAdmin, slugify, registrationPrefix, readEvent, listAll } from "../lib/_shared.mjs";
 
 const csvCell = value => `"${String(value ?? "").replaceAll('"', '""')}"`;
 

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {json,requireAdmin,parseJSON,store,listAll,readEvent,slugify,registrationPrefix} from './_shared.mjs';
+import {json,requireAdmin,parseJSON,store,listAll,readEvent,slugify,registrationPrefix} from '../lib/_shared.mjs';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const normalize = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 async function roster(slug) {

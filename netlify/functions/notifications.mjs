@@ -1,10 +1,10 @@
-import {verifyDirectProspect} from './_bonzo-api.mjs';
+import {verifyDirectProspect} from '../lib/_bonzo-api.mjs';
 import crypto from 'node:crypto';
-import {reportStatus,reportConfig,validateReport,reportSnapshot,reportCSV} from './_report.mjs';
-import {bonzoStatus,bonzoDiagnostic,requestBonzoIndex} from './_bonzo.mjs';
-import {publicEmailSettings,sendSelfTest} from './_email.mjs';
-import {json,requireAdmin,parseJSON,store,listAll} from './_shared.mjs';
-import {config,readiness,notificationRows,kickWorker,reasons} from './_notifications.mjs';
+import {reportStatus,reportConfig,validateReport,reportSnapshot,reportCSV} from '../lib/_report.mjs';
+import {bonzoStatus,bonzoDiagnostic,requestBonzoIndex} from '../lib/_bonzo.mjs';
+import {publicEmailSettings,sendSelfTest} from '../lib/_email.mjs';
+import {json,requireAdmin,parseJSON,store,listAll} from '../lib/_shared.mjs';
+import {config,readiness,notificationRows,kickWorker,reasons} from '../lib/_notifications.mjs';
 export default async req=>{const auth=requireAdmin(req);if(!auth.ok)return auth.response;try{
  if(req.method==='GET'&&new URL(req.url).searchParams.get('view')==='bonzo-diagnostic'){const result=await bonzoDiagnostic(new URL(req.url).searchParams.get('id')||'',new URL(req.url).searchParams.get('cursor')||'');if(result?.indexPending)result.dispatch=await requestBonzoIndex();return result?json(result):json({error:'Candidate not found.'},404);}
  if(req.method==='GET'&&new URL(req.url).searchParams.get('view')==='candidate-search'){

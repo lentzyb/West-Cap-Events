@@ -1,4 +1,4 @@
-import { json, requireAdmin } from "./_shared.mjs";
+import { json, requireAdmin } from "../lib/_shared.mjs";
 export default async req => {
   const auth = requireAdmin(req);
   if (!auth.ok) return auth.response;

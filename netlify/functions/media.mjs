@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {json,requireAdmin,store} from './_shared.mjs';
+import {json,requireAdmin,store} from '../lib/_shared.mjs';
 export function imageType(bytes){if(bytes.length<12)return '';if(bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return 'image/jpeg';if(Buffer.from(bytes.subarray(0,8)).equals(Buffer.from([137,80,78,71,13,10,26,10])))return 'image/png';if(Buffer.from(bytes.subarray(0,4)).toString()==='RIFF'&&Buffer.from(bytes.subarray(8,12)).toString()==='WEBP')return 'image/webp';return ''}
 export function videoType(bytes){if(bytes.length>=12&&Buffer.from(bytes.subarray(4,8)).toString()==='ftyp')return 'video/mp4';if(bytes.length>=4&&Buffer.from(bytes.subarray(0,4)).equals(Buffer.from([26,69,223,163])))return 'video/webm';return '';}
 export function byteRange(header,total){const m=String(header||'').match(/^bytes=(\d*)-(\d*)$/);if(!m||(!m[1]&&!m[2]))return null;let start,end;if(!m[1]){const count=Number(m[2]);if(!count)return null;start=Math.max(0,total-count);end=total-1}else{start=Number(m[1]);end=m[2]?Math.min(Number(m[2]),total-1):total-1}return Number.isSafeInteger(start)&&Number.isSafeInteger(end)&&start>=0&&start<total&&end>=start?{start,end}:null;}

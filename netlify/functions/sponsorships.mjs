@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { clean, eventKey, json, listAll, parseJSON, requireAdmin, store } from "./_shared.mjs";
+import { clean, eventKey, json, listAll, parseJSON, requireAdmin, store } from "../lib/_shared.mjs";
 
 export default async function sponsorships(req) {
   const auth = requireAdmin(req);

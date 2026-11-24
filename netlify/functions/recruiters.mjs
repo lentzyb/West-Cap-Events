@@ -1,5 +1,5 @@
-import {validEmail,normEmail} from "./_notifications.mjs";
-import { json, requireAdmin, parseJSON, clean, recruiterKey, listAll, store } from "./_shared.mjs";
+import {validEmail,normEmail} from "../lib/_notifications.mjs";
+import { json, requireAdmin, parseJSON, clean, recruiterKey, listAll, store } from "../lib/_shared.mjs";
 
 export default async req => {
   try {

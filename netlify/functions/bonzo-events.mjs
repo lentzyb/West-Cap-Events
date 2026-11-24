@@ -1,5 +1,5 @@
-import {json,store} from './_shared.mjs';
-import {bonzoEnabled,authorizedBonzo,saveBonzoMessage} from './_bonzo.mjs';
+import {json,store} from '../lib/_shared.mjs';
+import {bonzoEnabled,authorizedBonzo,saveBonzoMessage} from '../lib/_bonzo.mjs';
 export default async req=>{
  if(req.method!=='POST')return json({error:'Method not allowed.'},405);
  if(!bonzoEnabled())return json({error:'Bonzo receiver is not configured.'},503);

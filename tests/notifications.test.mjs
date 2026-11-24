@@ -1,7 +1,7 @@
 import {test,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import * as XLSX from 'xlsx';
-import {queueCandidate,runNotifications,token,localSchedule,resolveRecruiter} from '../netlify/functions/_notifications.mjs';
+import {queueCandidate,runNotifications,token,localSchedule,resolveRecruiter} from '../netlify/lib/_notifications.mjs';
 import attendees from '../netlify/functions/attendees.mjs';
 import followup from '../netlify/functions/follow-up.mjs';
 import notifications from '../netlify/functions/notifications.mjs';

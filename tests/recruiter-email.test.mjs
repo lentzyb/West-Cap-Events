@@ -1,6 +1,6 @@
 import {test,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
-import {recruiterEmailBody,queueCandidate,runNotifications} from '../netlify/functions/_notifications.mjs';
+import {recruiterEmailBody,queueCandidate,runNotifications} from '../netlify/lib/_notifications.mjs';
 const recruiter={id:'r1',name:'Brian Lentz',email:'brian@example.com',active:true};
 const rows=[{id:'a',eventSlug:'why',eventName:'Why West Cap',eventDate:'2026-11-01',eventEndTime:'15:00',eventTimeZone:'America/New_York',firstName:'Alex',lastName:'Example',email:'alex@example.com',phone:'3135550101',recruiterId:'r1'}];
 beforeEach(()=>{process.env.NOTIFICATION_SECRET='x'.repeat(40);process.env.NOTIFICATION_SITE_URL='https://events.example.com';process.env.BONZO_EVENT_HOOK_CODE='test';process.env.EMAIL_PROVIDER='resend';process.env.RESEND_API_KEY='test';process.env.NOTIFICATION_FROM_EMAIL='events@example.com';globalThis.testDB=new Map();});

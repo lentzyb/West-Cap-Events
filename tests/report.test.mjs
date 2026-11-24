@@ -1,8 +1,8 @@
 import {test,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
-import {reportConfig,reportSnapshot,reportEmail,reportCSV,runDailyReport,validateReport} from '../netlify/functions/_report.mjs';
-import {queueCandidate,kickWorker} from '../netlify/functions/_notifications.mjs';
-import {saveBonzoMessage} from '../netlify/functions/_bonzo.mjs';
+import {reportConfig,reportSnapshot,reportEmail,reportCSV,runDailyReport,validateReport} from '../netlify/lib/_report.mjs';
+import {queueCandidate,kickWorker} from '../netlify/lib/_notifications.mjs';
+import {saveBonzoMessage} from '../netlify/lib/_bonzo.mjs';
 import notifications from '../netlify/functions/notifications.mjs';
 let sent;
 const ended={slug:'test',name:'Why West Cap',date:'2026-10-20',endTime:'15:00',timeZone:'America/New_York'};

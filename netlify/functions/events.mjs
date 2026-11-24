@@ -1,6 +1,6 @@
-import { json, requireAdmin, parseJSON, clean, slugify, eventKey, readEvent, readRecruiter, readWebhook, listAll, store } from "./_shared.mjs";
-import { normalizePage } from "./_event-page.mjs";
-import { getBoardMeta, getMondayConfig, saveMondayConfig } from "./_monday.mjs";
+import { json, requireAdmin, parseJSON, clean, slugify, eventKey, readEvent, readRecruiter, readWebhook, listAll, store } from "../lib/_shared.mjs";
+import { normalizePage } from "../lib/_event-page.mjs";
+import { getBoardMeta, getMondayConfig, saveMondayConfig } from "../lib/_monday.mjs";
 
 const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value || "");
 const validTime = value => /^([01]\d|2[0-3]):[0-5]\d$/.test(value || "");

@@ -1,4 +1,4 @@
-import { json, slugify, readEvent, listAll } from "./_shared.mjs";
+import { json, slugify, readEvent, listAll } from "../lib/_shared.mjs";
 
 export default async req => {
   try {

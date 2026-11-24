@@ -1,7 +1,7 @@
-import {queueCandidate,kickWorker} from "./_notifications.mjs";
+import {queueCandidate,kickWorker} from "../lib/_notifications.mjs";
 import crypto from "node:crypto";
-import { json, requireAdmin, parseJSON, clean, slugify, registrationPrefix, readEvent, readRecruiter, listAll, store } from "./_shared.mjs";
-import { sendBonzoWebhook } from "./webhook-client.mjs";
+import { json, requireAdmin, parseJSON, clean, slugify, registrationPrefix, readEvent, readRecruiter, listAll, store } from "../lib/_shared.mjs";
+import { sendBonzoWebhook } from "../lib/webhook-client.mjs";
 
 export default async req => {
   try {
