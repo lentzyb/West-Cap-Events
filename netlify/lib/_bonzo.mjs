@@ -76,10 +76,15 @@ export function outreachState(row,event,messages,now=Date.now()){
  if(now<end)return {eligible:false,status:'Waiting for event to end'};
  const contact=messages.filter(m=>m.accepted&&m.sentAt>end&&m.sentAt<=now&&matchesContact(row,m)).sort((a,b)=>b.sentAt-a.sentAt)[0];
  if(!contact&&apiEnabled()){const check=messages.find(m=>m.lookupKey===lookupKey(row));
-  const usable=c=>Boolean(c)&&c.outcome==='found'&&(c.boundary===undefined||c.boundary===end)&&Date.now()-Date.parse(c.checkedAt)<=checkValidMs;
+  const current=c=>Boolean(c)&&(c.boundary===undefined||c.boundary===end)&&Date.now()-Date.parse(c.checkedAt)<=checkValidMs;
+  const usable=c=>current(c)&&c.outcome==='found';
+  // A finished search of the recruiter's and the team's records that finds nobody is an answer, not a failed check:
+  // the candidate is not in Bonzo, so no follow-up can have been logged. The recruiter is told so.
+  const settled=check?.revision===lookupRevision&&(check.complete?check:!check.error?check.previous:null);
+  if(current(settled)&&settled.outcome==='no_match')return {eligible:true,status:'Not in Bonzo',notInBonzo:true};
   // A finished check is trusted for checkValidMs. During a re-check the last finished result stands until the new one lands.
   const verified=check?.revision===lookupRevision&&(check.complete?usable(check):!check.error&&usable(check.previous));
-  if(!verified)return {eligible:false,status:check?.error?'Bonzo check unverified: '+check.error:check?.outcome==='no_match'?'Not found in Bonzo: no record with this email or phone under the recruiter or the team':'Bonzo verification pending',unverified:true,...(check?.outcome==='no_match'&&!check?.error?{notFound:true}:{})};}
+  if(!verified)return {eligible:false,status:check?.error?'Bonzo check unverified: '+check.error:'Bonzo verification pending',unverified:true};}
  return contact?{eligible:false,status:'Contacted in Bonzo',contactedAt:new Date(contact.sentAt).toISOString(),contactType:contact.type,campaign:contact.campaign}:{eligible:true,status:'Needs post-event outreach (none recorded)'};
 }
 export async function bonzoMessages(selectedRows=null){
