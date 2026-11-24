@@ -14,7 +14,7 @@ async function finish(){let state;do{state=await lookupStep(row,saveBonzoMessage
 test('targeted diagnostic bypasses global indexing, verifies exact prospect and never reads unrelated messages',async()=>{
  testDB.set('bonzo-message:unrelated',{content:'unrelated history'});
  let result;do{result=await bonzoDiagnostic('candidate');}while(result.lookupPending);
- assert.equal(result.messages.length,1);assert.equal(result.messages[0].qualifies,true);assert.equal(result.apiCheck.outcome,'found');assert.equal(calls.length,3);assert.ok(calls.every(url=>url.startsWith('https://app.getbonzo.com/api/v3/')));
+ assert.equal(result.messages.length,1);assert.equal(result.messages[0].qualifies,true);assert.equal(result.apiCheck.outcome,'found');assert.equal(calls.length,5);assert.ok(calls.every(url=>url.startsWith('https://app.getbonzo.com/api/v3/')));
  assert.equal(calls.filter(url=>url.includes('/messages?')).length,1);
  const messages=await bonzoMessages();assert.equal(outreachState(row,event,messages).status,'Contacted in Bonzo');
  assert.ok(!JSON.stringify([...testDB.values()]).includes('private message'));assert.ok(!JSON.stringify([...testDB.values()]).includes('private-token'));

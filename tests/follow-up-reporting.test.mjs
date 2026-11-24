@@ -76,3 +76,28 @@ test('messages Bonzo returns without a direction are classified by exact sender 
  const saved=[...testDB.values()].find(value=>value?.messageId==='1');assert.equal(saved.directionBasis,'contact-match');assert.equal(saved.accepted,true);
  const check=testDB.get(lookupKey(testDB.get('followup:c3')));assert.deepEqual(check.fieldNames,['created_at','id','prospect_id','status','type','updated_at']);
 });
+test('a candidate missing from the recruiter\'s own records is found under the team, and a true miss is reported as Not found in Bonzo',async()=>{
+ seed(2);const scoped=[];
+ globalThis.fetch=async(url,options)=>{url=String(url);if(url.includes('/messages?'))return page([]);const owner=options.headers['On-Behalf-Of'];scoped.push(owner?'owner':'team');
+  // The recruiter owns neither record; a teammate owns candidate 0, nobody has candidate 1.
+  return page(!owner&&decodeURIComponent(url).includes('c0@example.com')?prospectFor(url):[]);};
+ await refresh();const rows=Object.fromEntries((await reportSnapshot()).rows.map(row=>[row.lastName,row]));
+ assert.ok(scoped.includes('owner')&&scoped.includes('team'));
+ assert.equal(rows['000'].category,'Needs outreach');
+ assert.equal(rows['001'].category,'Not found in Bonzo');assert.match(rows['001'].status,/^Not found in Bonzo/);
+ assert.equal(outreachState(testDB.get('followup:c1'),event,await bonzoMessages()).eligible,false);
+ assert.equal((await reportSnapshot()).counts['Not found in Bonzo'],1);
+});
+test('a remembered or linked Bonzo record that no longer exists falls back to search instead of failing the check',async()=>{
+ seed(1);const row=testDB.get('followup:c0');
+ const {lookupKey:key}=await import('../netlify/lib/_bonzo-api.mjs');
+ testDB.set('bonzo-direct:'+key(row).slice('bonzo-lookup:'.length),{prospectId:'777'});
+ globalThis.fetch=async url=>{url=String(url);if(url.includes('/prospects/777'))return new Response('',{status:404});return url.includes('/messages?')?page([]):page(prospectFor(url));};
+ await refresh();const state=outreachState(row,event,await bonzoMessages());
+ assert.equal(state.status,'Needs post-event outreach (none recorded)');
+});
+test('an unclassified post-event message reports its type, status and the field names Bonzo returned',async()=>{
+ seed(1);globalThis.fetch=async url=>{url=String(url);return url.includes('/messages?')?page([{id:9,prospect_id:'1000',type:'sms',status:'delivered',direction:null,body:'private text',user_id:4,created_at:'2026-01-02T13:00:00Z',updated_at:'2026-01-02T13:00:00Z'}]):page(prospectFor(url));};
+ await refresh();const status=(await reportSnapshot()).rows[0].status;
+ assert.match(status,/direction=null, type=sms, status=delivered/);assert.match(status,/Fields Bonzo returned: body created_at direction id prospect_id status type updated_at user_id/);assert.ok(!status.includes('private text'));
+});
