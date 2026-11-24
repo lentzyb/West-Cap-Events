@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 
 const STORE_NAME = "wcl-event-platform-v2";
 export const store = () => getStore({ name: STORE_NAME, consistency: "strong" });
+// The deployed site's own address, so links work on any copy of this project.
+export const siteOrigin = () => { try { const u = new URL(process.env.NOTIFICATION_SITE_URL || process.env.URL || ""); return u.protocol === "https:" ? u.origin : "https://westcap-events.netlify.app"; } catch { return "https://westcap-events.netlify.app"; } };
 
 export const json = (data, status = 200, extraHeaders = {}) =>
   new Response(JSON.stringify(data), {

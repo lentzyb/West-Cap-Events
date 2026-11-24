@@ -1,19 +1,31 @@
-import {messageDirection,directionDescription,directionBasis} from './_bonzo-message.mjs';
+import {messageDirection,directionDescription,directionBasis,fieldNames} from './_bonzo-message.mjs';
 export {messageDirection} from './_bonzo-message.mjs';
 import crypto from 'node:crypto';
 import {store,listAll} from './_shared.mjs';
 const email=v=>String(v||'').trim().toLowerCase();
 const phone=v=>{const d=String(v||'').replace(/\D/g,'');return d.length===11&&d[0]==='1'?d.slice(1):d};
-export const lookupRevision=6;
+export const lookupRevision=7;
+// A finished check stays usable for reporting for three hours; the hourly refresh renews it well inside that window.
+export const checkValidMs=3*3600000;
+// A refresh cycle does not re-query a candidate it already verified this recently.
+export const checkReuseMs=30*60000;
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+let nextSlot=0;
+const minGap=()=>{const value=Number(process.env.BONZO_API_MIN_INTERVAL_MS);return process.env.BONZO_API_MIN_INTERVAL_MS!==undefined&&Number.isFinite(value)&&value>=0?Math.min(value,5000):150};
+const limited=until=>{const error=Error('Bonzo rate limit reached. Try again later.');error.rateLimited=true;error.retryAt=until;return error};
 export const successfulStatus=(type,status)=>['sent','delivered','completed'].includes(status)||(type==='call'&&status==='answered');
 export const apiEnabled=()=>Boolean(process.env.BONZO_API_TOKEN?.trim());
 export const lookupKey=row=>'bonzo-lookup:'+crypto.createHash('sha256').update(JSON.stringify([email(row.email),phone(row.phone),row.eventSlug,row.recruiterId||''])).digest('hex');
 const exact=(row,p)=>{const e=email(row.email),f=phone(row.phone),pe=email(p.email),pf=phone(p.phone);return Boolean((e&&e===pe)||(f.length>=10&&f===pf))&&(!e||!pe||e===pe)&&(!(f.length>=10&&pf.length>=10)||f===pf)};
 async function get(path,collection=true,{owner}={}){
- const cooldown=await store().get('bonzo-api:cooldown',{type:'json'});if(cooldown?.until>Date.now())throw Error(cooldown.error);
+ const cooldown=await store().get('bonzo-api:cooldown',{type:'json'});if(cooldown?.until>Date.now())throw cooldown.rateLimited?limited(cooldown.until):Error(cooldown.error);
+ // Space requests out; unpaced bursts are what trip the provider's rate limit.
+ const gap=minGap();if(gap){const now=Date.now(),slot=Math.min(Math.max(now,nextSlot),now+gap*4);nextSlot=slot+gap;if(slot>now)await sleep(slot-now);}
  let response;try{response=await fetch('https://app.getbonzo.com/api/v3/'+path,{method:'GET',redirect:'error',headers:{accept:'application/json',authorization:'Bearer '+process.env.BONZO_API_TOKEN.trim(),...(owner?{'On-Behalf-Of':owner}:{})},signal:AbortSignal.timeout(20000)});}catch(error){throw Error(error.name==='TimeoutError'||error.name==='AbortError'?'Bonzo request timed out.':'Bonzo connection failed or redirected.');}
  if(response.status===403&&owner){const error=Error('Recruiter-scoped API access is unavailable.');error.ownerScopeDenied=true;throw error;}
- if(!response.ok){const error=response.status===401?'Bonzo rejected the API token.':response.status===403?'Bonzo API permission or account access is missing.':response.status===429?'Bonzo rate limit reached. Try again later.':'Bonzo lookup failed (HTTP '+response.status+').';if([401,403,429].includes(response.status))await store().setJSON('bonzo-api:cooldown',{until:Date.now()+60000,error});throw Error(error);}
+ // A rate limit is a pause, not a verdict about any candidate: honor Retry-After and let callers resume.
+ if(response.status===429){const seconds=Number(response.headers.get('retry-after'));const until=Date.now()+(Number.isFinite(seconds)&&seconds>0?Math.min(seconds,180):60)*1000;await store().setJSON('bonzo-api:cooldown',{until,error:'Bonzo rate limit reached. Try again later.',rateLimited:true});throw limited(until);}
+ if(!response.ok){const error=response.status===401?'Bonzo rejected the API token.':response.status===403?'Bonzo API permission or account access is missing.':response.status===429?'Bonzo rate limit reached. Try again later.':'Bonzo lookup failed (HTTP '+response.status+').';if([401,403].includes(response.status))await store().setJSON('bonzo-api:cooldown',{until:Date.now()+60000,error});throw Error(error);}
  let body;try{body=await response.json();}catch{throw Error('Bonzo returned a non-JSON response.');}if(collection?!Array.isArray(body.data):!body.data||Array.isArray(body.data)||typeof body.data!=='object')throw Error('Bonzo returned an unexpected response.');return body;
 }
 function hasNext(body,page){if(body.links&&Object.hasOwn(body.links,'next'))return Boolean(body.links.next);if(Number.isInteger(body.meta?.last_page))return page<body.meta.last_page;throw Error('Bonzo pagination could not be verified.');}
@@ -46,10 +58,14 @@ async function indexedProspects(row){
  return [...ids].slice(0,10);
 }
 // One bounded API page per step; only exact contacts can lead to message requests.
-async function advanceLookup(row,save,boundary){
+async function advanceLookup(row,save,boundary,{since}={}){
  const db=store(),key=lookupKey(row),prior=await db.get(key,{type:'json'});
- if(prior?.revision===lookupRevision&&prior.complete&&(boundary===undefined||prior.boundary===boundary)&&Date.now()-Date.parse(prior.checkedAt)<10*60000)return prior;
- let state=prior?.revision===lookupRevision&&!prior.complete&&!prior.error&&(boundary===undefined||prior.boundary===boundary)?prior:{phase:'search',term:0,page:1,prospects:[],prospect:0,reviewed:0,complete:false,boundary,revision:lookupRevision,directions:{outgoing:0,incoming:0,other:0},ownerScopeDenied:prior?.ownerScopeDenied===true};
+ const reuseAfter=Number.isFinite(since)?since:Date.now()-10*60000;
+ const comparable=prior?.revision===lookupRevision&&(boundary===undefined||prior.boundary===boundary);
+ if(comparable&&prior.complete&&Date.parse(prior.checkedAt)>=reuseAfter)return prior;
+ // While a re-check is running (or paused by a rate limit) the last finished result keeps standing.
+ const previous=comparable?(prior.complete&&!prior.error?{outcome:prior.outcome,boundary:prior.boundary,checkedAt:prior.checkedAt}:prior.previous):undefined;
+ let state=comparable&&!prior.complete&&!prior.error?prior:{phase:'search',term:0,page:1,prospects:[],prospect:0,reviewed:0,complete:false,boundary,revision:lookupRevision,directions:{outgoing:0,incoming:0,other:0},ambiguous:0,ownerScopeDenied:prior?.ownerScopeDenied===true,...(previous?{previous}:{})};
  const linked=await db.get(directKey(row),{type:'json'});if(state.phase==='search'&&state.term===0&&state.page===1&&!state.indexChecked){state.indexChecked=true;if(linked)state.phase='direct';else {state.indexIds=await indexedProspects(row);state.indexCursor=0;if(state.indexIds.length)state.phase='indexed';}}
  const terms=[email(row.email),phone(row.phone).length>=10?phone(row.phone):''].filter(Boolean);
  try{
@@ -75,27 +91,33 @@ async function advanceLookup(row,save,boundary){
    const p=state.prospects[state.prospect];
    const body=await get('prospects/'+p.id+'/messages?page='+state.page);
    for(const m of body.data){
-    state.reviewed++;const normalized=messageDirection(m),direction=normalized==='unknown'?'other':normalized;state.directionSamples||=[];const sample=directionDescription(m);if(!state.directionSamples.includes(sample)&&state.directionSamples.length<5)state.directionSamples.push(sample);state.directions||={outgoing:0,incoming:0,other:0};state.directions[direction]++;const created=Date.parse(m.created_at);if(Number.isFinite(created)&&(!state.newestAt||created>Date.parse(state.newestAt)))state.newestAt=new Date(created).toISOString();
+    state.reviewed++;state.fieldNames||=fieldNames(m);const normalized=messageDirection(m,p),direction=normalized==='unknown'?'other':normalized;state.directionSamples||=[];const sample=directionDescription(m);if(!state.directionSamples.includes(sample)&&state.directionSamples.length<5)state.directionSamples.push(sample);state.directions||={outgoing:0,incoming:0,other:0};state.directions[direction]++;const created=Date.parse(m.created_at);if(Number.isFinite(created)&&(!state.newestAt||created>Date.parse(state.newestAt)))state.newestAt=new Date(created).toISOString();
     if(String(m.prospect_id)!==p.id)throw Error('Bonzo returned a message for a different prospect.');
-    if(normalized==='outgoing')try{await save({event:'messages.outgoing.updated',prospect:{id:p.id,email:p.email,phone:p.phone,business:{id:p.business}},additional:{message:{...m,direction:normalized,_directionBasis:directionBasis(m)}}});}catch(error){throw Error(error.message==='Invalid message timestamp.'?'Bonzo message timestamp is missing, ambiguous or invalid.':error.message==='Missing message or prospect ID.'?'Bonzo message identifier is missing.':error.message==='Conflicting prospect IDs.'?'Bonzo message prospect identifier conflicts.':'Saving Bonzo message metadata failed.');}
+    // An unclassifiable message only matters if it could be post-event outreach: successful, supported and after the event ended.
+    if(normalized==='unknown'){const made=Date.parse(m.created_at),at=Math.max(made,m.send_at?Date.parse(m.send_at):made);if(successfulStatus(m.type,m.status)&&!m.error_message&&['sms','email','call','voicemail'].includes(m.type)&&(!Number.isFinite(boundary)||!Number.isFinite(at)||(at>boundary&&at<=Date.now())))state.ambiguous=(state.ambiguous||0)+1;}
+    if(normalized==='outgoing')try{await save({event:'messages.outgoing.updated',prospect:{id:p.id,email:p.email,phone:p.phone,business:{id:p.business}},additional:{message:{...m,direction:normalized,_directionBasis:directionBasis(m,p)}}});}catch(error){throw Error(error.message==='Invalid message timestamp.'?'Bonzo message timestamp is missing, ambiguous or invalid.':error.message==='Missing message or prospect ID.'?'Bonzo message identifier is missing.':error.message==='Conflicting prospect IDs.'?'Bonzo message prospect identifier conflicts.':'Saving Bonzo message metadata failed.');}
    }
-   const confirmed=Number.isFinite(boundary)&&body.data.some(m=>{const created=Date.parse(m.created_at),sent=m.send_at?Date.parse(m.send_at):created;return messageDirection(m)==='outgoing'&&successfulStatus(m.type,m.status)&&!m.error_message&&['sms','email','call','voicemail'].includes(m.type)&&Math.max(created,sent)>boundary&&Math.max(created,sent)<=Date.now();});
+   const confirmed=Number.isFinite(boundary)&&body.data.some(m=>{const created=Date.parse(m.created_at),sent=m.send_at?Date.parse(m.send_at):created;return messageDirection(m,p)==='outgoing'&&successfulStatus(m.type,m.status)&&!m.error_message&&['sms','email','call','voicemail'].includes(m.type)&&Math.max(created,sent)>boundary&&Math.max(created,sent)<=Date.now();});
    if(confirmed)state={...state,complete:true,confirmed:true,outcome:'found'};
    else if(hasNext(body,state.page)){if(state.page>=100)throw Error('Candidate message history exceeded the lookup limit. Check is incomplete.');state.page++;}
    else{state.prospect++;state.page=1;if(state.prospect>=state.prospects.length)state={...state,complete:true,outcome:'found'};}
   }
-  if(state.complete&&state.directions?.other>0&&state.outcome==='found'&&!state.confirmed){state.complete=false;state.error='Bonzo direction is unrecognized: '+(state.directionSamples||[]).join('; ')+'. Outreach remains unverified.';}
+  if(state.complete&&state.ambiguous>0&&state.outcome==='found'&&!state.confirmed){state.complete=false;state.error='Bonzo direction is unrecognized: '+state.ambiguous+' post-event message(s) could not be classified as sent or received ('+(state.directionSamples||[]).join('; ')+'). Outreach remains unverified.';}
+  if(state.complete)delete state.previous;
   state={...state,lookupKey:key,checkedAt:new Date().toISOString()};await db.setJSON(key,state);return state;
- }catch(error){state={...state,lookupKey:key,complete:false,error:['Direct Bonzo link is unavailable.','Linked Bonzo record no longer matches this candidate.','Bonzo rejected the API token.','Bonzo API permission or account access is missing.','Bonzo rate limit reached. Try again later.','Candidate needs an email or phone number.','Candidate search is too broad; lookup is incomplete.','Bonzo returned a message for a different prospect.','Candidate message history exceeded the lookup limit. Check is incomplete.','Bonzo pagination could not be verified.','Bonzo returned an unexpected response.','Bonzo request timed out.','Bonzo connection failed or redirected.','Bonzo returned a non-JSON response.','Bonzo message timestamp is missing, ambiguous or invalid.','Bonzo message identifier is missing.','Bonzo message prospect identifier conflicts.','Saving Bonzo message metadata failed.'].includes(error.message)||/^Bonzo lookup failed \(HTTP [1-5][0-9]{2}\)\.$/.test(error.message)?error.message:'Bonzo check could not finish. Please retry.',checkedAt:new Date().toISOString()};state.error+=' Stage: '+(['direct','indexed'].includes(state.phase)?'direct prospect access':state.phase==='search'?'candidate search':'candidate messages')+'.';await db.setJSON(key,state);return state;}
+ }catch(error){
+  // Keep saved progress untouched; the caller waits out the limit and resumes this candidate.
+  if(error.rateLimited)return {...state,lookupKey:key,complete:false,rateLimited:true,retryAt:error.retryAt};
+  state={...state,lookupKey:key,complete:false,error:['Direct Bonzo link is unavailable.','Linked Bonzo record no longer matches this candidate.','Bonzo rejected the API token.','Bonzo API permission or account access is missing.','Bonzo rate limit reached. Try again later.','Candidate needs an email or phone number.','Candidate search is too broad; lookup is incomplete.','Bonzo returned a message for a different prospect.','Candidate message history exceeded the lookup limit. Check is incomplete.','Bonzo pagination could not be verified.','Bonzo returned an unexpected response.','Bonzo request timed out.','Bonzo connection failed or redirected.','Bonzo returned a non-JSON response.','Bonzo message timestamp is missing, ambiguous or invalid.','Bonzo message identifier is missing.','Bonzo message prospect identifier conflicts.','Saving Bonzo message metadata failed.'].includes(error.message)||/^Bonzo lookup failed \(HTTP [1-5][0-9]{2}\)\.$/.test(error.message)?error.message:'Bonzo check could not finish. Please retry.',checkedAt:new Date().toISOString()};state.error+=' Stage: '+(['direct','indexed'].includes(state.phase)?'direct prospect access':state.phase==='search'?'candidate search':'candidate messages')+'.';await db.setJSON(key,state);return state;}
 }
-export async function lookupStep(row,save,boundary){
+export async function lookupStep(row,save,boundary,options){
  const db=store(),key='bonzo-api-lease:'+lookupKey(row).slice('bonzo-lookup:'.length),prior=await db.getWithMetadata(key,{type:'json'});
  if(prior?.data?.expiresAt>Date.now())return {busy:true,complete:false,reviewed:0};
  const lease={owner:crypto.randomUUID(),expiresAt:Date.now()+60000};
  if(!(await db.setJSON(key,lease,prior?{onlyIfMatch:prior.etag}:{onlyIfNew:true})).modified)return {busy:true,complete:false,reviewed:0};
- try{return await advanceLookup(row,save,boundary);}finally{const current=await db.getWithMetadata(key,{type:'json'});if(current?.data?.owner===lease.owner)await db.setJSON(key,{...lease,expiresAt:0},{onlyIfMatch:current.etag});}
+ try{return await advanceLookup(row,save,boundary,options);}finally{const current=await db.getWithMetadata(key,{type:'json'});if(current?.data?.owner===lease.owner)await db.setJSON(key,{...lease,expiresAt:0},{onlyIfMatch:current.etag});}
 }
-export async function refreshEventCandidates(save,eventEnd,messages=[],outreachState=()=>({}),{budgetMs=4*60000}={}){
+export async function refreshEventCandidates(save,eventEnd,messages=[],outreachState=()=>({}),{budgetMs=4*60000,since}={}){
  if(!apiEnabled())return {remaining:0,checked:0};
  const db=store(),leaseKey='bonzo-refresh:lease',prior=await db.getWithMetadata(leaseKey,{type:'json'});
  if(prior?.data?.expiresAt>Date.now())return {busy:true,remaining:0,checked:0};
@@ -108,8 +130,15 @@ export async function refreshEventCandidates(save,eventEnd,messages=[],outreachS
  const unique=[...new Map(rows.filter(r=>!r.importRemoved&&external.has(r.eventSlug)&&!outreachState(r,eventMap.get(r.eventSlug),messages).contactedAt).map(r=>[lookupKey(r),r])).values()];
  // Unchecked candidates go first; a slow or failing search cannot starve the tail forever.
  unique.sort((a,b)=>(Date.parse(checkMap.get(lookupKey(a))?.checkedAt)||0)-(Date.parse(checkMap.get(lookupKey(b))?.checkedAt)||0));
- const deadline=Date.now()+budgetMs;let checked=0,offset=0;
- for(;offset<unique.length&&Date.now()<deadline;offset+=3){await Promise.all(unique.slice(offset,offset+3).map(async row=>{let result;do{result=await lookupStep(row,save,eventEnd(eventMap.get(row.eventSlug)));if(result.busy)break;}while(!result.complete&&!result.error&&Date.now()<deadline);checked++;}));}
- const result={remaining:Math.max(0,unique.length-offset),checked,total:unique.length,at:new Date().toISOString()};await db.setJSON('bonzo-refresh:latest',result);return result;
+ const deadline=Date.now()+budgetMs,reuse=Number.isFinite(since)?since:Date.now()-checkReuseMs,done=new Set();let offset=0,limitedUntil=0;
+ while(offset<unique.length&&Date.now()<deadline){
+  let wait=0;
+  await Promise.all(unique.slice(offset,offset+3).map(async row=>{let result;do{result=await lookupStep(row,save,eventEnd(eventMap.get(row.eventSlug)),{since:reuse});if(result.busy)break;if(result.rateLimited){wait=Math.max(wait,result.retryAt||Date.now()+60000);return;}}while(!result.complete&&!result.error&&Date.now()<deadline);done.add(lookupKey(row));}));
+  // Rate limited: wait it out and resume the same candidates instead of marking the rest of the list as failed.
+  if(wait){limitedUntil=wait;if(wait>=deadline)break;await sleep(Math.max(0,wait-Date.now())+250);continue;}
+  offset+=3;
+ }
+ const checked=done.size;
+ const result={remaining:Math.max(0,unique.length-offset),checked,total:unique.length,at:new Date().toISOString(),...(limitedUntil?{rateLimitedUntil:new Date(limitedUntil).toISOString()}:{})};await db.setJSON('bonzo-refresh:latest',result);return result;
  }finally{const current=await db.getWithMetadata(leaseKey,{type:'json'});if(current?.data?.owner===lease.owner)await db.setJSON(leaseKey,{...lease,expiresAt:0},{onlyIfMatch:current.etag});}
 }
