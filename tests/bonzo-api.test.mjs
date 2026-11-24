@@ -67,8 +67,8 @@ test('diagnostics preserve safe HTTP, timeout, JSON and timestamp failure reason
  testDB.delete(lookupKey(row));globalThis.fetch=async url=>page(String(url).includes('/messages?')?[{...message,created_at:'2026-01-02 13:00:00'}]:[prospect]);const state=await finish();assert.match(state.error,/timestamp/);assert.match(state.error,/Stage: candidate messages/);
 });
 
-test('candidate search uses bounded pagination and deferred counts, never show_all',async()=>{
- globalThis.fetch=async url=>{const u=new URL(url);assert.equal(u.searchParams.has('show_all'),false);assert.equal(u.searchParams.get('defer_count'),'1');assert.equal(u.searchParams.get('exact_count'),'0');assert.equal(u.searchParams.get('per_page'),'25');return page([prospect]);};
+test('candidate search includes permitted team prospects with bounded pages and deferred counts',async()=>{
+ globalThis.fetch=async url=>{const u=new URL(url);assert.equal(u.searchParams.get('show_all'),'1');assert.equal(u.searchParams.get('defer_count'),'1');assert.equal(u.searchParams.get('exact_count'),'0');assert.equal(u.searchParams.get('per_page'),'25');return page([prospect]);};
  assert.equal((await lookupStep(row,saveBonzoMessage)).error,undefined);
 });
 test('direct prospect link validates the exact record and bypasses search on subsequent checks',async()=>{
@@ -113,4 +113,24 @@ test('null direction with positive sent SMS evidence counts the follow-up, while
  let result;do{result=await bonzoDiagnostic('candidate');}while(result.lookupPending);
  assert.ok(!result.lookupError);assert.equal(result.messages.filter(m=>m.qualifies).length,1);assert.equal(result.messages.find(m=>m.messageId==='42').directionBasis,'sent-status');
  assert.equal(outreachState(row,event,await bonzoMessages()).status,'Contacted in Bonzo');
+});
+test('automatic lookup reuses contact-index prospect IDs after fresh identity validation',async()=>{
+ await saveBonzoMessage({event:'messages.outgoing.updated',prospect,additional:{message:{...message,id:'older',created_at:'2025-01-01T00:00:00Z',updated_at:'2025-01-01T00:00:00Z',direction:null,type:'call',status:'answered'}}});
+ calls=[];globalThis.fetch=async url=>{calls.push(String(url));assert.ok(!String(url).includes('search='));return String(url).includes('/messages?')?page([message]):Response.json({data:prospect});};
+ let result;do{result=await bonzoDiagnostic('candidate');}while(result.lookupPending);
+ assert.equal(result.messages.some(m=>m.qualifies),true);assert.equal(calls.length,2);assert.ok(calls[0].endsWith('/prospects/12'));assert.ok(calls[1].includes('/prospects/12/messages?'));
+});
+test('stale indexed identity is rejected and falls back to permitted exact search',async()=>{
+ await saveBonzoMessage({event:'messages.outgoing.updated',prospect,additional:{message:{...message,created_at:'2025-01-01T00:00:00Z',updated_at:'2025-01-01T00:00:00Z'}}});
+ calls=[];globalThis.fetch=async url=>{calls.push(String(url));assert.ok(!String(url).includes('/messages?'));return String(url).includes('/prospects/12')?Response.json({data:{...prospect,email:'other@example.com',phone:'5555555555'}}):page([]);};
+ const result=await finish();assert.equal(result.outcome,'no_match');assert.equal(calls.filter(u=>u.includes('show_all=1')).length,2);
+});
+test('team-wide search discovers a prospect omitted from the default list and invalidates old no-match cache',async()=>{
+ testDB.set(lookupKey(row),{lookupKey:lookupKey(row),revision:4,complete:true,outcome:'no_match',checkedAt:new Date().toISOString()});
+ globalThis.fetch=async url=>{calls.push(String(url));const u=new URL(url);if(u.pathname.endsWith('/messages'))return page([message]);assert.equal(u.searchParams.get('show_all'),'1');assert.equal(u.searchParams.get('per_page'),'25');return page([prospect]);};
+ let result;do{result=await bonzoDiagnostic('candidate');}while(result.lookupPending);assert.equal(result.messages.some(m=>m.qualifies),true);assert.equal(calls.filter(u=>u.includes('/messages?')).length,1);
+});
+test('one-candidate search status does not load unrelated follow-ups or lookup records',async()=>{
+ testDB.set('followup:unrelated',()=>{});testDB.set('bonzo-lookup:unrelated',()=>{});
+ const messages=await bonzoMessages([row]);assert.deepEqual(messages,[]);
 });

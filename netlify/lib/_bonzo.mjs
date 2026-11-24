@@ -1,7 +1,7 @@
 import {directionBasis} from './_bonzo-message.mjs';
 import crypto from 'node:crypto';
 import {store,listAll} from './_shared.mjs';
-import {apiEnabled,lookupKey,lookupStep,successfulStatus,messageDirection} from './_bonzo-api.mjs';
+import {apiEnabled,lookupRevision,lookupKey,lookupStep,successfulStatus,messageDirection} from './_bonzo-api.mjs';
 const digest=v=>crypto.createHash('sha256').update(v).digest('hex');
 const email=v=>String(v||'').trim().toLowerCase();
 const phone=v=>{const d=String(v||'').replace(/\D/g,'');return d.length===11&&d[0]==='1'?d.slice(1):d};
@@ -75,13 +75,13 @@ export function outreachState(row,event,messages,now=Date.now()){
  const end=eventEnd(event);if(end===null)return {eligible:false,status:'Set event end date, time and time zone'};
  if(now<end)return {eligible:false,status:'Waiting for event to end'};
  const contact=messages.filter(m=>m.accepted&&m.sentAt>end&&m.sentAt<=now&&matchesContact(row,m)).sort((a,b)=>b.sentAt-a.sentAt)[0];
- if(!contact&&apiEnabled()){const check=messages.find(m=>m.lookupKey===lookupKey(row));if(check?.revision!==4||!check?.complete||check.outcome!=='found'||(check.boundary!==undefined&&check.boundary!==end)||Date.now()-Date.parse(check.checkedAt)>10*60000)return {eligible:false,status:check?.error||check?.outcome==='no_match'?'Bonzo check unverified: '+(check?.error||'No matching prospect visible to this API account'):'Bonzo verification pending',unverified:true};}
+ if(!contact&&apiEnabled()){const check=messages.find(m=>m.lookupKey===lookupKey(row));if(check?.revision!==lookupRevision||!check?.complete||check.outcome!=='found'||(check.boundary!==undefined&&check.boundary!==end)||Date.now()-Date.parse(check.checkedAt)>10*60000)return {eligible:false,status:check?.error||check?.outcome==='no_match'?'Bonzo check unverified: '+(check?.error||'No matching prospect visible to this API account'):'Bonzo verification pending',unverified:true};}
  return contact?{eligible:false,status:'Contacted in Bonzo',contactedAt:new Date(contact.sentAt).toISOString(),contactType:contact.type,campaign:contact.campaign}:{eligible:true,status:'Needs post-event outreach (none recorded)'};
 }
-export async function bonzoMessages(){
+export async function bonzoMessages(selectedRows=null){
  if(!bonzoEnabled())return [];
  if(!apiEnabled())return listAll('bonzo-message:');
- const [rows,checks]=await Promise.all([listAll('followup:'),listAll('bonzo-lookup:')]);
+ const [rows,checks]=selectedRows?[selectedRows,(await Promise.all(selectedRows.map(row=>store().get(lookupKey(row),{type:'json'})))).filter(Boolean)]:await Promise.all([listAll('followup:'),listAll('bonzo-lookup:')]);
  const prefixes=new Set(rows.flatMap(row=>[email(row.email)&&indexPrefix('email',email(row.email)),phone(row.phone).length>=10&&indexPrefix('phone',phone(row.phone))].filter(Boolean)));
  const keys=new Set();for(const prefix of prefixes){const page=await store().list({prefix});for(const blob of page.blobs||[])keys.add(blob.key);}
  const messages=new Map();const entries=[...keys];for(let i=0;i<entries.length;i+=12)await Promise.all(entries.slice(i,i+12).map(async key=>{const pointer=await store().get(key,{type:'json'});if(pointer?.messageKey){const m=await store().get(pointer.messageKey,{type:'json'});if(m)messages.set(pointer.messageKey,m);}}));

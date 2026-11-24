@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import {store,listAll} from './_shared.mjs';
 const email=v=>String(v||'').trim().toLowerCase();
 const phone=v=>{const d=String(v||'').replace(/\D/g,'');return d.length===11&&d[0]==='1'?d.slice(1):d};
+export const lookupRevision=5;
 export const successfulStatus=(type,status)=>['sent','delivered','completed'].includes(status)||(type==='call'&&status==='answered');
 export const apiEnabled=()=>Boolean(process.env.BONZO_API_TOKEN?.trim());
 export const lookupKey=row=>'bonzo-lookup:'+crypto.createHash('sha256').update(JSON.stringify([email(row.email),phone(row.phone),row.eventSlug,row.recruiterId||''])).digest('hex');
@@ -30,12 +31,25 @@ export async function verifyDirectProspect(row,value){
  await store().setJSON(lookupKey(row),{phase:'direct',page:1,prospects:[],prospect:0,reviewed:0,complete:false});
  return {ok:true};
 }
+// Recover IDs only from this candidate's contact index; never scan global history.
+async function indexedProspects(row){
+ const db=store(),keys=new Set(),ids=new Set();
+ for(const [kind,value] of [['email',email(row.email)],['phone',phone(row.phone)]]){
+  if(!value||(kind==='phone'&&value.length<10))continue;
+  const prefix='bonzo-contact:'+crypto.createHash('sha256').update(kind+':'+value).digest('hex')+':';
+  const page=await db.list({prefix});for(const blob of page.blobs||[])keys.add(blob.key);
+ }
+ // The index is a discovery hint, never proof of present identity or outreach.
+ const entries=[...keys].slice(0,200);
+ for(let offset=0;offset<entries.length;offset+=12)await Promise.all(entries.slice(offset,offset+12).map(async key=>{const pointer=await db.get(key,{type:'json'});if(!pointer?.messageKey?.startsWith('bonzo-message:'))return;const m=await db.get(pointer.messageKey,{type:'json'});if(m&&exact(row,m)&&/^\d+$/.test(String(m.prospectId)))ids.add(String(m.prospectId));}));
+ return [...ids].slice(0,10);
+}
 // One bounded API page per step; only exact contacts can lead to message requests.
 async function advanceLookup(row,save,boundary){
  const db=store(),key=lookupKey(row),prior=await db.get(key,{type:'json'});
- if(prior?.revision===4&&prior.complete&&(boundary===undefined||prior.boundary===boundary)&&Date.now()-Date.parse(prior.checkedAt)<10*60000)return prior;
- let state=prior?.revision===4&&!prior.complete&&!prior.error&&(boundary===undefined||prior.boundary===boundary)?prior:{phase:'search',term:0,page:1,prospects:[],prospect:0,reviewed:0,complete:false,boundary,revision:4,directions:{outgoing:0,incoming:0,other:0}};
- const linked=await db.get(directKey(row),{type:'json'});if(linked&&state.phase==='search'&&state.term===0&&state.page===1)state.phase='direct';
+ if(prior?.revision===lookupRevision&&prior.complete&&(boundary===undefined||prior.boundary===boundary)&&Date.now()-Date.parse(prior.checkedAt)<10*60000)return prior;
+ let state=prior?.revision===lookupRevision&&!prior.complete&&!prior.error&&(boundary===undefined||prior.boundary===boundary)?prior:{phase:'search',term:0,page:1,prospects:[],prospect:0,reviewed:0,complete:false,boundary,revision:lookupRevision,directions:{outgoing:0,incoming:0,other:0}};
+ const linked=await db.get(directKey(row),{type:'json'});if(state.phase==='search'&&state.term===0&&state.page===1&&!state.indexChecked){state.indexChecked=true;if(linked)state.phase='direct';else {state.indexIds=await indexedProspects(row);state.indexCursor=0;if(state.indexIds.length)state.phase='indexed';}}
  const terms=[email(row.email),phone(row.phone).length>=10?phone(row.phone):''].filter(Boolean);
  try{
   if(!terms.length)throw Error('Candidate needs an email or phone number.');
@@ -44,8 +58,12 @@ async function advanceLookup(row,save,boundary){
    const body=await get('prospects/'+prospectId(linked.prospectId),false),p=body.data;
    if(String(p.id)!==linked.prospectId||!exact(row,p))throw Error('Linked Bonzo record no longer matches this candidate.');
    state={...state,phase:'messages',prospects:[{id:String(p.id),email:email(p.email),phone:phone(p.phone),business:p.business?.id||''}],page:1,prospect:0,boundary};
+  }else if(state.phase==='indexed'){
+   const id=state.indexIds[state.indexCursor],body=await get('prospects/'+id,false),p=body.data;
+   if(String(p.id)===id&&exact(row,p)&&!state.prospects.some(x=>x.id===id))state.prospects.push({id,email:email(p.email),phone:phone(p.phone),business:p.business?.id||''});
+   state.indexCursor++;if(state.indexCursor>=state.indexIds.length)state.phase=state.prospects.length?'messages':'search';
   }else if(state.phase==='search'){
-   const body=await get('prospects?'+new URLSearchParams({search:terms[state.term],defer_count:'1',exact_count:'0',per_page:'25',page:String(state.page)}));
+   const body=await get('prospects?'+new URLSearchParams({search:terms[state.term],show_all:'1',defer_count:'1',exact_count:'0',per_page:'25',page:String(state.page)}));
    for(const p of body.data){if(exact(row,p)&&/^\d+$/.test(String(p.id))&&!state.prospects.some(x=>x.id===String(p.id)))state.prospects.push({id:String(p.id),email:email(p.email),phone:phone(p.phone),business:p.business?.id||''});}
    if(hasNext(body,state.page)){if(state.page>=5)throw Error('Candidate search is too broad; lookup is incomplete.');state.page++;}
    else{state.term++;state.page=1;if(state.term>=terms.length){state.phase='messages';if(!state.prospects.length)state={...state,complete:true,outcome:'no_match'};}}
@@ -64,7 +82,7 @@ async function advanceLookup(row,save,boundary){
   }
   if(state.complete&&state.directions?.other>0&&state.outcome==='found'&&!state.confirmed){state.complete=false;state.error='Bonzo direction is unrecognized: '+(state.directionSamples||[]).join('; ')+'. Outreach remains unverified.';}
   state={...state,lookupKey:key,checkedAt:new Date().toISOString()};await db.setJSON(key,state);return state;
- }catch(error){state={...state,lookupKey:key,complete:false,error:['Direct Bonzo link is unavailable.','Linked Bonzo record no longer matches this candidate.','Bonzo rejected the API token.','Bonzo API permission or account access is missing.','Bonzo rate limit reached. Try again later.','Candidate needs an email or phone number.','Candidate search is too broad; lookup is incomplete.','Bonzo returned a message for a different prospect.','Candidate message history exceeded the lookup limit. Check is incomplete.','Bonzo pagination could not be verified.','Bonzo returned an unexpected response.','Bonzo request timed out.','Bonzo connection failed or redirected.','Bonzo returned a non-JSON response.','Bonzo message timestamp is missing, ambiguous or invalid.','Bonzo message identifier is missing.','Bonzo message prospect identifier conflicts.','Saving Bonzo message metadata failed.'].includes(error.message)||/^Bonzo lookup failed \(HTTP [1-5][0-9]{2}\)\.$/.test(error.message)?error.message:'Bonzo check could not finish. Please retry.',checkedAt:new Date().toISOString()};state.error+=' Stage: '+(state.phase==='direct'?'direct prospect access':state.phase==='search'?'candidate search':'candidate messages')+'.';await db.setJSON(key,state);return state;}
+ }catch(error){state={...state,lookupKey:key,complete:false,error:['Direct Bonzo link is unavailable.','Linked Bonzo record no longer matches this candidate.','Bonzo rejected the API token.','Bonzo API permission or account access is missing.','Bonzo rate limit reached. Try again later.','Candidate needs an email or phone number.','Candidate search is too broad; lookup is incomplete.','Bonzo returned a message for a different prospect.','Candidate message history exceeded the lookup limit. Check is incomplete.','Bonzo pagination could not be verified.','Bonzo returned an unexpected response.','Bonzo request timed out.','Bonzo connection failed or redirected.','Bonzo returned a non-JSON response.','Bonzo message timestamp is missing, ambiguous or invalid.','Bonzo message identifier is missing.','Bonzo message prospect identifier conflicts.','Saving Bonzo message metadata failed.'].includes(error.message)||/^Bonzo lookup failed \(HTTP [1-5][0-9]{2}\)\.$/.test(error.message)?error.message:'Bonzo check could not finish. Please retry.',checkedAt:new Date().toISOString()};state.error+=' Stage: '+(['direct','indexed'].includes(state.phase)?'direct prospect access':state.phase==='search'?'candidate search':'candidate messages')+'.';await db.setJSON(key,state);return state;}
 }
 export async function lookupStep(row,save,boundary){
  const db=store(),key='bonzo-api-lease:'+lookupKey(row).slice('bonzo-lookup:'.length),prior=await db.getWithMetadata(key,{type:'json'});
