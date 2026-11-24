@@ -19,3 +19,14 @@ Item 4's sender/recipient matching assumes field names such as `to`, `from`, `to
 Upload the extracted contents to the same GitHub repository and let Netlify publish. No environment variable changes are required. Cached checks from the previous version are re-verified on the next run.
 
 120 automated tests and the build passed. No live Bonzo request or email was sent during development.
+
+## Second update (after the first live report)
+
+The first report on the fixed code showed 41 Unverified rows with real reasons: 36 "no matching prospect", 4 unclassified direction, 1 HTTP 404.
+
+1. **Search covers the whole team, not only the assigned recruiter.** The search ran against the recruiter's own Bonzo records and stopped there when that worked, so a candidate held under a teammate (an import or a campaign) was reported as not visible. It now searches the recruiter's records and then every record the API account can see.
+2. **"Not found in Bonzo" is its own report category.** A candidate with no Bonzo record under the recruiter or the team is no longer mixed in with failed checks. Reminders for these are still held, as before.
+3. **A deleted or merged Bonzo record no longer fails the check.** A remembered or manually linked prospect ID that returns 404 is skipped and the candidate is searched for again.
+4. **Unclassified messages now say what they are.** The status shows the message type and status and lists the field names Bonzo returned (names only), so the direction rule can be finished from the next CSV export.
+
+123 automated tests and the build passed.
