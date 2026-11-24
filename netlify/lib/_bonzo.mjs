@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import {store,listAll} from './_shared.mjs';
-import {apiEnabled,lookupKey,lookupStep,successfulStatus} from './_bonzo-api.mjs';
+import {apiEnabled,lookupKey,lookupStep,successfulStatus,messageDirection} from './_bonzo-api.mjs';
 const digest=v=>crypto.createHash('sha256').update(v).digest('hex');
 const email=v=>String(v||'').trim().toLowerCase();
 const phone=v=>{const d=String(v||'').replace(/\D/g,'');return d.length===11&&d[0]==='1'?d.slice(1):d};
@@ -56,13 +56,14 @@ export async function saveBonzoMessage(payload){
  const created=instant(m.created_at),updated=instant(m.updated_at||m.created_at),scheduled=m.send_at?instant(m.send_at):created;
  if(!Number.isFinite(created)||!Number.isFinite(updated)||!Number.isFinite(scheduled)||updated>Date.now()+300000)throw Error('Invalid message timestamp.');
  const contact={email:email(p.email),phone:phone(p.phone)};
- const accepted=m.direction==='outgoing'&&successfulStatus(m.type,m.status)&&!m.error_message&&Math.max(created,scheduled)<=Date.now()&&['sms','email','call','voicemail'].includes(m.type);
- const rejectionReason=accepted?'':m.direction!=='outgoing'?'Message direction is not outgoing':m.error_message?'Bonzo reported a send error':!successfulStatus(m.type,m.status)?'Message status does not confirm a successful send or answered call':!['sms','email','call','voicemail'].includes(m.type)?'Message type is not supported':'Message is scheduled for the future';
+ const direction=messageDirection(m);
+ const accepted=direction==='outgoing'&&successfulStatus(m.type,m.status)&&!m.error_message&&Math.max(created,scheduled)<=Date.now()&&['sms','email','call','voicemail'].includes(m.type);
+ const rejectionReason=accepted?'':direction!=='outgoing'?'Message direction is not outgoing':m.error_message?'Bonzo reported a send error':!successfulStatus(m.type,m.status)?'Message status does not confirm a successful send or answered call':!['sms','email','call','voicemail'].includes(m.type)?'Message type is not supported':'Message is scheduled for the future';
  const key='bonzo-message:'+digest(`${p.business?.id||''}:${p.id}:${m.id}`),s=store();
  for(let attempt=0;attempt<5;attempt++){
   const old=await s.getWithMetadata(key,{type:'json'});
-  if(old&&(old.data.updated>updated||(old.data.updated===updated&&old.data.parserVersion===2))){await indexMessage(old.data);return {duplicate:true};}
-  const row={id:key,parserVersion:2,direction:['outgoing','incoming'].includes(m.direction)?m.direction:'other',prospectId:String(p.id),messageId:String(m.id),...contact,type:m.type,status:m.status,campaign:Boolean(m.campaign_id),sentAt:Math.max(created,scheduled),updated,accepted,rejectionReason,receivedAt:new Date().toISOString()};
+  if(old&&(old.data.updated>updated||(old.data.updated===updated&&old.data.parserVersion===3))){await indexMessage(old.data);return {duplicate:true};}
+  const row={id:key,parserVersion:3,direction,prospectId:String(p.id),messageId:String(m.id),...contact,type:m.type,status:m.status,campaign:Boolean(m.campaign_id),sentAt:Math.max(created,scheduled),updated,accepted,rejectionReason,receivedAt:new Date().toISOString()};
   const result=await s.setJSON(key,row,old?{onlyIfMatch:old.etag}:{onlyIfNew:true});if(result.modified){await indexMessage(row);await s.setJSON('bonzo-hook:latest',{at:row.receivedAt});return {saved:true}}
  }
  throw Error('Concurrent update; retry delivery.');
@@ -73,7 +74,7 @@ export function outreachState(row,event,messages,now=Date.now()){
  const end=eventEnd(event);if(end===null)return {eligible:false,status:'Set event end date, time and time zone'};
  if(now<end)return {eligible:false,status:'Waiting for event to end'};
  const contact=messages.filter(m=>m.accepted&&m.sentAt>end&&m.sentAt<=now&&matchesContact(row,m)).sort((a,b)=>b.sentAt-a.sentAt)[0];
- if(!contact&&apiEnabled()){const check=messages.find(m=>m.lookupKey===lookupKey(row));if(check?.revision!==2||!check?.complete||check.outcome!=='found'||(check.boundary!==undefined&&check.boundary!==end)||Date.now()-Date.parse(check.checkedAt)>10*60000)return {eligible:false,status:check?.error||check?.outcome==='no_match'?'Bonzo check unverified: '+(check?.error||'No matching prospect visible to this API account'):'Bonzo verification pending',unverified:true};}
+ if(!contact&&apiEnabled()){const check=messages.find(m=>m.lookupKey===lookupKey(row));if(check?.revision!==3||!check?.complete||check.outcome!=='found'||(check.boundary!==undefined&&check.boundary!==end)||Date.now()-Date.parse(check.checkedAt)>10*60000)return {eligible:false,status:check?.error||check?.outcome==='no_match'?'Bonzo check unverified: '+(check?.error||'No matching prospect visible to this API account'):'Bonzo verification pending',unverified:true};}
  return contact?{eligible:false,status:'Contacted in Bonzo',contactedAt:new Date(contact.sentAt).toISOString(),contactType:contact.type,campaign:contact.campaign}:{eligible:true,status:'Needs post-event outreach (none recorded)'};
 }
 export async function bonzoMessages(){

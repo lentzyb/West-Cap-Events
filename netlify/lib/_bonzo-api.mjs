@@ -1,3 +1,5 @@
+import {messageDirection,directionDescription} from './_bonzo-message.mjs';
+export {messageDirection} from './_bonzo-message.mjs';
 import crypto from 'node:crypto';
 import {store,listAll} from './_shared.mjs';
 const email=v=>String(v||'').trim().toLowerCase();
@@ -31,8 +33,8 @@ export async function verifyDirectProspect(row,value){
 // One bounded API page per step; only exact contacts can lead to message requests.
 async function advanceLookup(row,save,boundary){
  const db=store(),key=lookupKey(row),prior=await db.get(key,{type:'json'});
- if(prior?.revision===2&&prior.complete&&(boundary===undefined||prior.boundary===boundary)&&Date.now()-Date.parse(prior.checkedAt)<10*60000)return prior;
- let state=prior?.revision===2&&!prior.complete&&!prior.error&&(boundary===undefined||prior.boundary===boundary)?prior:{phase:'search',term:0,page:1,prospects:[],prospect:0,reviewed:0,complete:false,boundary,revision:2,directions:{outgoing:0,incoming:0,other:0}};
+ if(prior?.revision===3&&prior.complete&&(boundary===undefined||prior.boundary===boundary)&&Date.now()-Date.parse(prior.checkedAt)<10*60000)return prior;
+ let state=prior?.revision===3&&!prior.complete&&!prior.error&&(boundary===undefined||prior.boundary===boundary)?prior:{phase:'search',term:0,page:1,prospects:[],prospect:0,reviewed:0,complete:false,boundary,revision:3,directions:{outgoing:0,incoming:0,other:0}};
  const linked=await db.get(directKey(row),{type:'json'});if(linked&&state.phase==='search'&&state.term===0&&state.page===1)state.phase='direct';
  const terms=[email(row.email),phone(row.phone).length>=10?phone(row.phone):''].filter(Boolean);
  try{
@@ -51,15 +53,16 @@ async function advanceLookup(row,save,boundary){
    const p=state.prospects[state.prospect];
    const body=await get('prospects/'+p.id+'/messages?page='+state.page);
    for(const m of body.data){
-    state.reviewed++;const direction=['outgoing','incoming'].includes(m.direction)?m.direction:'other';state.directions||={outgoing:0,incoming:0,other:0};state.directions[direction]++;const created=Date.parse(m.created_at);if(Number.isFinite(created)&&(!state.newestAt||created>Date.parse(state.newestAt)))state.newestAt=new Date(created).toISOString();
+    state.reviewed++;const normalized=messageDirection(m),direction=normalized==='unknown'?'other':normalized;state.directionSamples||=[];const sample=directionDescription(m);if(!state.directionSamples.includes(sample)&&state.directionSamples.length<5)state.directionSamples.push(sample);state.directions||={outgoing:0,incoming:0,other:0};state.directions[direction]++;const created=Date.parse(m.created_at);if(Number.isFinite(created)&&(!state.newestAt||created>Date.parse(state.newestAt)))state.newestAt=new Date(created).toISOString();
     if(String(m.prospect_id)!==p.id)throw Error('Bonzo returned a message for a different prospect.');
-    if(m.direction==='outgoing')try{await save({event:'messages.outgoing.updated',prospect:{id:p.id,email:p.email,phone:p.phone,business:{id:p.business}},additional:{message:m}});}catch(error){throw Error(error.message==='Invalid message timestamp.'?'Bonzo message timestamp is missing, ambiguous or invalid.':error.message==='Missing message or prospect ID.'?'Bonzo message identifier is missing.':error.message==='Conflicting prospect IDs.'?'Bonzo message prospect identifier conflicts.':'Saving Bonzo message metadata failed.');}
+    if(normalized==='outgoing')try{await save({event:'messages.outgoing.updated',prospect:{id:p.id,email:p.email,phone:p.phone,business:{id:p.business}},additional:{message:{...m,direction:normalized}}});}catch(error){throw Error(error.message==='Invalid message timestamp.'?'Bonzo message timestamp is missing, ambiguous or invalid.':error.message==='Missing message or prospect ID.'?'Bonzo message identifier is missing.':error.message==='Conflicting prospect IDs.'?'Bonzo message prospect identifier conflicts.':'Saving Bonzo message metadata failed.');}
    }
-   const confirmed=Number.isFinite(boundary)&&body.data.some(m=>{const created=Date.parse(m.created_at),sent=m.send_at?Date.parse(m.send_at):created;return m.direction==='outgoing'&&successfulStatus(m.type,m.status)&&!m.error_message&&['sms','email','call','voicemail'].includes(m.type)&&Math.max(created,sent)>boundary&&Math.max(created,sent)<=Date.now();});
-   if(confirmed)state={...state,complete:true,outcome:'found'};
+   const confirmed=Number.isFinite(boundary)&&body.data.some(m=>{const created=Date.parse(m.created_at),sent=m.send_at?Date.parse(m.send_at):created;return messageDirection(m)==='outgoing'&&successfulStatus(m.type,m.status)&&!m.error_message&&['sms','email','call','voicemail'].includes(m.type)&&Math.max(created,sent)>boundary&&Math.max(created,sent)<=Date.now();});
+   if(confirmed)state={...state,complete:true,confirmed:true,outcome:'found'};
    else if(hasNext(body,state.page)){if(state.page>=100)throw Error('Candidate message history exceeded the lookup limit. Check is incomplete.');state.page++;}
    else{state.prospect++;state.page=1;if(state.prospect>=state.prospects.length)state={...state,complete:true,outcome:'found'};}
   }
+  if(state.complete&&state.directions?.other>0&&state.outcome==='found'&&!state.confirmed){state.complete=false;state.error='Bonzo direction is unrecognized: '+(state.directionSamples||[]).join('; ')+'. Outreach remains unverified.';}
   state={...state,lookupKey:key,checkedAt:new Date().toISOString()};await db.setJSON(key,state);return state;
  }catch(error){state={...state,lookupKey:key,complete:false,error:['Direct Bonzo link is unavailable.','Linked Bonzo record no longer matches this candidate.','Bonzo rejected the API token.','Bonzo API permission or account access is missing.','Bonzo rate limit reached. Try again later.','Candidate needs an email or phone number.','Candidate search is too broad; lookup is incomplete.','Bonzo returned a message for a different prospect.','Candidate message history exceeded the lookup limit. Check is incomplete.','Bonzo pagination could not be verified.','Bonzo returned an unexpected response.','Bonzo request timed out.','Bonzo connection failed or redirected.','Bonzo returned a non-JSON response.','Bonzo message timestamp is missing, ambiguous or invalid.','Bonzo message identifier is missing.','Bonzo message prospect identifier conflicts.','Saving Bonzo message metadata failed.'].includes(error.message)||/^Bonzo lookup failed \(HTTP [1-5][0-9]{2}\)\.$/.test(error.message)?error.message:'Bonzo check could not finish. Please retry.',checkedAt:new Date().toISOString()};state.error+=' Stage: '+(state.phase==='direct'?'direct prospect access':state.phase==='search'?'candidate search':'candidate messages')+'.';await db.setJSON(key,state);return state;}
 }

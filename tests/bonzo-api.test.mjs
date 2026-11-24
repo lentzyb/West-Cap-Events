@@ -83,3 +83,21 @@ test('direct prospect access denial and conflicting contact cannot save a link o
  globalThis.fetch=async()=>new Response('',{status:403});await assert.rejects(()=>verifyDirectProspect(row,'12'),/permission/);assert.ok(![...testDB.keys()].some(k=>k.startsWith('bonzo-direct:')));
  testDB.delete('bonzo-api:cooldown');globalThis.fetch=async()=>Response.json({data:{...prospect,email:'wrong@example.com'}});await assert.rejects(()=>verifyDirectProspect(row,'12'),/does not exactly match/);assert.ok(![...testDB.keys()].some(k=>k.startsWith('bonzo-direct:')));
 });
+test('API direction aliases and explicit flags recognize post-event outgoing messages without counting incoming replies',async()=>{
+ const {messageDirection}=await import('../netlify/lib/_bonzo-api.mjs');
+ for(const value of ['outbound','OUT',' Outgoing ','outcoming',{value:'outgoing'}])assert.equal(messageDirection({direction:value}),'outgoing');
+ assert.equal(messageDirection({is_outgoing:true}),'outgoing');assert.equal(messageDirection({is_incoming:true}),'incoming');
+ assert.equal(messageDirection({direction:'incoming',is_outgoing:true}),'unknown');assert.equal(messageDirection({direction:1}),'unknown');
+ globalThis.fetch=async url=>page(String(url).includes('/messages?')?[
+  {...message,id:'31',direction:'INBOUND'},
+  {...message,id:'32',direction:'OUTBOUND'}
+ ]:[prospect]);
+ let result;do{result=await bonzoDiagnostic('candidate');}while(result.lookupPending);
+ assert.equal(result.messages.filter(m=>m.qualifies).length,1);assert.equal(result.apiCheck.directions.outgoing,1);assert.equal(result.apiCheck.directions.incoming,1);assert.equal(result.apiCheck.directions.other,0);
+ assert.equal(outreachState(row,event,await bonzoMessages()).status,'Contacted in Bonzo');
+});
+test('unknown direction values cannot certify no outreach; report and reminders remain unverified',async()=>{
+ globalThis.fetch=async url=>page(String(url).includes('/messages?')?[{...message,direction:1}]:[prospect]);
+ const state=await finish();assert.equal(state.complete,false);assert.match(state.error,/direction=number:1/);assert.equal(outreachState(row,event,await bonzoMessages()).eligible,false);assert.equal(outreachState(row,event,await bonzoMessages()).unverified,true);
+ const {reportSnapshot}=await import('../netlify/lib/_report.mjs');assert.equal((await reportSnapshot()).rows[0].category,'Unverified');
+});
