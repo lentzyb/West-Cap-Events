@@ -10,7 +10,7 @@ export default async req=>{const auth=requireAdmin(req);if(!auth.ok)return auth.
  if(req.method==='GET'&&new URL(req.url).searchParams.get('view')==='candidate-search'){
   const query=(new URL(req.url).searchParams.get('q')||'').trim().toLowerCase();if(query.length<2)return json({rows:[]});
   const rows=(await listAll('followup:')).filter(row=>[row.firstName,row.lastName,row.eventName].join(' ').toLowerCase().includes(query));
-  return json({total:rows.length,rows:rows.slice(0,30).map(({id,firstName,lastName,eventName})=>({id,firstName,lastName,eventName}))});
+  return json({total:rows.length,rows:await notificationRows(new Set(rows.slice(0,30).map(r=>r.id)))});
  }
  if(req.method==='GET'&&new URL(req.url).searchParams.get('view')==='settings')return json({settings:await config(),reportSettings:await reportConfig()});
  if(req.method==='GET'&&new URL(req.url).searchParams.get('view')==='rows')return json({rows:await notificationRows()});
