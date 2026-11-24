@@ -27,3 +27,24 @@ test('notification settings reject incomplete setup and remain off until explici
 test('a crash after provider acceptance repairs receipts from durable sent jobs rather than sending again',async()=>{await queueCandidate(candidate);await runNotifications();for(const key of [...testDB.keys()])if(key.startsWith('notification-receipt:'))testDB.delete(key);await runNotifications();assert.equal(sent.length,1)});
 test('new registration still writes CRM and Calendly tracking while queuing the assigned recruiter',async()=>{const {default:registration}=await import('../netlify/functions/registrations.mjs');const originalFetch=globalThis.fetch;globalThis.fetch=async(url,opts)=>String(url).includes('hooks.getbonzo.com')?Response.json({ok:true}):originalFetch(url,opts);testDB.set('event:why-west-cap',{slug:'why-west-cap',name:'Why West Cap',recruiterRoutes:[{recruiterId:'r1',webhookUrl:'https://hooks.getbonzo.com/hook'}]});testDB.set('recruiter:r1',{...recruiter,showCalendly:true,calendlyUrl:'https://calendly.com/test/intro'});const r=await registration(request({firstName:'Alex',lastName:'Example',nmlsId:'123456',phone:'3135551212',email:'alex@example.com',recruiterId:'r1'},'https://test.local/registrations?slug=why-west-cap'));assert.equal(r.status,201);const d=await r.json();assert.equal(d.webhookSync,'completed');assert.equal(d.calendly.enabled,true);assert.equal([...testDB.keys()].filter(k=>k.startsWith('followup:')).length,1);assert.equal(sent.length,0)});
 test('a corrected recruiter email cancels the old pending payload and sends only to the new address',async()=>{await queueCandidate(candidate);failEmail=true;await runNotifications();testDB.set('recruiter:r1',{...recruiter,email:'corrected@example.com'});failEmail=false;await runNotifications();assert.equal(sent.length,1);assert.deepEqual(sent[0].payload.to,['corrected@example.com']);assert.equal([...testDB.values()].filter(j=>j.payload&&j.status==='cancelled').length,1)});
+test('eligibility explains zero manual sends held for Bonzo verification',async()=>{
+ const {candidateEligibility}=await import('../netlify/lib/_notifications.mjs');
+ process.env.BONZO_API_TOKEN='test-only';
+ try{
+ testDB.set('event:why-west-cap',{slug:'why-west-cap',name:'Why West Cap',date:'2026-01-01',endTime:'19:00',timeZone:'America/New_York'});
+ await queueCandidate(candidate);
+ const before=await candidateEligibility();assert.equal(before.counts.total,1);assert.equal(before.counts.unverified,1);assert.equal(before.counts.eligible,0);
+ const id=crypto.randomUUID();testDB.set('recruiter-request:'+id,{id,status:'pending',createdAt:new Date().toISOString()});
+ await runNotifications({recruiterRequestId:id});
+ assert.equal(sent.length,0);assert.equal(testDB.get('recruiter-request:'+id).status,'pending');assert.equal(testDB.get('recruiter-request:'+id).verificationHeld,true);assert.equal(testDB.get('recruiter-request:'+id).plan,null);assert.equal(testDB.get('recruiter-manual:latest').eligibility.unverified,1);
+ const {lookupKey}=await import('../netlify/lib/_bonzo-api.mjs');const {eventEnd}=await import('../netlify/lib/_bonzo.mjs');const row=[...testDB.entries()].find(([key])=>key.startsWith('followup:'))[1],key=lookupKey(row);testDB.set(key,{lookupKey:key,revision:4,complete:true,outcome:'found',checkedAt:new Date().toISOString(),boundary:eventEnd(testDB.get('event:why-west-cap'))});await runNotifications({recruiterRequestId:id});assert.equal(sent.length,1);assert.equal(testDB.get('recruiter-request:'+id).status,'done');await runNotifications({recruiterRequestId:id});assert.equal(sent.length,1);
+ }finally{delete process.env.BONZO_API_TOKEN;}
+});
+test('eligibility counts exclusive exclusions and internal events cannot send reminders',async()=>{
+ const {candidateEligibility}=await import('../netlify/lib/_notifications.mjs');
+ testDB.set('event:party',{slug:'party',questionnaire:'internal'});
+ for(const [id,extra] of [['eligible',{}],['internal',{eventSlug:'party'}],['missing',{recruiterId:'missing'}],['stopped',{}],['removed',{importRemoved:true}]])testDB.set('followup:'+id,{...candidate,id,...extra});
+ testDB.set('followup-stop:stopped',{id:'stopped',stopped:true});
+ const {counts}=await candidateEligibility();assert.equal(counts.total,5);assert.equal(counts.eligible,1);assert.equal(counts.internal,1);assert.equal(counts.inactiveRecruiter,1);assert.equal(counts.stopped,1);assert.equal(counts.removed,1);
+ await runNotifications();assert.equal(sent.length,1);assert.ok(!sent[0].payload.text.includes('/event/party'));
+});
