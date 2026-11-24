@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import {store,listAll} from './_shared.mjs';
 const email=v=>String(v||'').trim().toLowerCase();
 const phone=v=>{const d=String(v||'').replace(/\D/g,'');return d.length===11&&d[0]==='1'?d.slice(1):d};
-export const lookupRevision=7;
+export const lookupRevision=8;
 // A finished check stays usable for reporting for three hours; the hourly refresh renews it well inside that window.
 export const checkValidMs=3*3600000;
 // A refresh cycle does not re-query a candidate it already verified this recently.
@@ -25,7 +25,7 @@ async function get(path,collection=true,{owner}={}){
  if(response.status===403&&owner){const error=Error('Recruiter-scoped API access is unavailable.');error.ownerScopeDenied=true;throw error;}
  // A rate limit is a pause, not a verdict about any candidate: honor Retry-After and let callers resume.
  if(response.status===429){const seconds=Number(response.headers.get('retry-after'));const until=Date.now()+(Number.isFinite(seconds)&&seconds>0?Math.min(seconds,180):60)*1000;await store().setJSON('bonzo-api:cooldown',{until,error:'Bonzo rate limit reached. Try again later.',rateLimited:true});throw limited(until);}
- if(!response.ok){const error=response.status===401?'Bonzo rejected the API token.':response.status===403?'Bonzo API permission or account access is missing.':response.status===429?'Bonzo rate limit reached. Try again later.':'Bonzo lookup failed (HTTP '+response.status+').';if([401,403].includes(response.status))await store().setJSON('bonzo-api:cooldown',{until:Date.now()+60000,error});throw Error(error);}
+ if(!response.ok){const error=response.status===401?'Bonzo rejected the API token.':response.status===403?'Bonzo API permission or account access is missing.':response.status===429?'Bonzo rate limit reached. Try again later.':'Bonzo lookup failed (HTTP '+response.status+').';if([401,403].includes(response.status))await store().setJSON('bonzo-api:cooldown',{until:Date.now()+60000,error});const failure=Error(error);failure.status=response.status;throw failure;}
  let body;try{body=await response.json();}catch{throw Error('Bonzo returned a non-JSON response.');}if(collection?!Array.isArray(body.data):!body.data||Array.isArray(body.data)||typeof body.data!=='object')throw Error('Bonzo returned an unexpected response.');return body;
 }
 function hasNext(body,page){if(body.links&&Object.hasOwn(body.links,'next'))return Boolean(body.links.next);if(Number.isInteger(body.meta?.last_page))return page<body.meta.last_page;throw Error('Bonzo pagination could not be verified.');}
@@ -72,21 +72,31 @@ async function advanceLookup(row,save,boundary,{since}={}){
   if(!terms.length)throw Error('Candidate needs an email or phone number.');
   if(state.phase==='direct'){
    if(!linked?.prospectId)throw Error('Direct Bonzo link is unavailable.');
-   const body=await get('prospects/'+prospectId(linked.prospectId),false),p=body.data;
+   // A linked record Bonzo has since deleted or merged is not a failed check: search for the current record instead.
+   let body;try{body=await get('prospects/'+prospectId(linked.prospectId),false);}catch(error){if(error.status!==404)throw error;}
+   if(!body)state={...state,phase:'search',term:0,page:1,linkMissing:true};
+   else{const p=body.data;
    if(String(p.id)!==linked.prospectId||!exact(row,p))throw Error('Linked Bonzo record no longer matches this candidate.');
-   state={...state,phase:'messages',prospects:[{id:String(p.id),email:email(p.email),phone:phone(p.phone),business:p.business?.id||''}],page:1,prospect:0,boundary};
+   state={...state,phase:'messages',prospects:[{id:String(p.id),email:email(p.email),phone:phone(p.phone),business:p.business?.id||''}],page:1,prospect:0,boundary};}
   }else if(state.phase==='indexed'){
-   const id=state.indexIds[state.indexCursor],body=await get('prospects/'+id,false),p=body.data;
-   if(String(p.id)===id&&exact(row,p)&&!state.prospects.some(x=>x.id===id))state.prospects.push({id,email:email(p.email),phone:phone(p.phone),business:p.business?.id||''});
+   // IDs remembered from earlier activity can point at records Bonzo has deleted or merged; skip those.
+   const id=state.indexIds[state.indexCursor];let body;try{body=await get('prospects/'+id,false);}catch(error){if(error.status!==404)throw error;}
+   const p=body?.data;
+   if(p&&String(p.id)===id&&exact(row,p)&&!state.prospects.some(x=>x.id===id))state.prospects.push({id,email:email(p.email),phone:phone(p.phone),business:p.business?.id||''});
    state.indexCursor++;if(state.indexCursor>=state.indexIds.length)state.phase=state.prospects.length?'messages':'search';
   }else if(state.phase==='search'){
    const recruiter=row.recruiterId?await db.get('recruiter:'+row.recruiterId,{type:'json'}):null;
-   const owner=state.ownerScopeDenied?undefined:recruiter?.email;
+   // Search the recruiter's own records first, then every record the account can see. A candidate can sit under
+   // another teammate (an import or a campaign), so an empty recruiter-scoped result is not a verdict.
+   const scopes=[...(recruiter?.email&&!state.ownerScopeDenied?['owner']:[]),'team'],scope=scopes[Math.min(state.scope||0,scopes.length-1)];
+   const owner=scope==='owner'?recruiter.email:undefined;
    let body;try{body=await get('prospects?'+new URLSearchParams({search:terms[state.term],...(owner?{}:{show_all:'1'}),defer_count:'1',exact_count:'0',per_page:'25',page:String(state.page)}),true,{owner});}
-   catch(error){if(!error.ownerScopeDenied)throw error;state.ownerScopeDenied=true;state={...state,lookupKey:key,checkedAt:new Date().toISOString()};await db.setJSON(key,state);return state;}
+   catch(error){if(!error.ownerScopeDenied)throw error;state.ownerScopeDenied=true;state.term=0;state.page=1;state.scope=0;state={...state,lookupKey:key,checkedAt:new Date().toISOString()};await db.setJSON(key,state);return state;}
    for(const p of body.data){if(exact(row,p)&&/^\d+$/.test(String(p.id))&&!state.prospects.some(x=>x.id===String(p.id)))state.prospects.push({id:String(p.id),email:email(p.email),phone:phone(p.phone),business:p.business?.id||''});}
    if(hasNext(body,state.page)){if(state.page>=5)throw Error('Candidate search is too broad; lookup is incomplete.');state.page++;}
-   else{state.term++;state.page=1;if(state.term>=terms.length){state.phase='messages';if(!state.prospects.length)state={...state,complete:true,outcome:'no_match'};}}
+   else{state.term++;state.page=1;if(state.term>=terms.length){
+    if(scope==='owner'&&scopes.length>1){state.scope=(state.scope||0)+1;state.term=0;}
+    else{state.phase='messages';if(!state.prospects.length)state={...state,complete:true,outcome:'no_match'};}}}
   }else{
    const p=state.prospects[state.prospect];
    const body=await get('prospects/'+p.id+'/messages?page='+state.page);
@@ -102,7 +112,7 @@ async function advanceLookup(row,save,boundary,{since}={}){
    else if(hasNext(body,state.page)){if(state.page>=100)throw Error('Candidate message history exceeded the lookup limit. Check is incomplete.');state.page++;}
    else{state.prospect++;state.page=1;if(state.prospect>=state.prospects.length)state={...state,complete:true,outcome:'found'};}
   }
-  if(state.complete&&state.ambiguous>0&&state.outcome==='found'&&!state.confirmed){state.complete=false;state.error='Bonzo direction is unrecognized: '+state.ambiguous+' post-event message(s) could not be classified as sent or received ('+(state.directionSamples||[]).join('; ')+'). Outreach remains unverified.';}
+  if(state.complete&&state.ambiguous>0&&state.outcome==='found'&&!state.confirmed){state.complete=false;state.error='Bonzo direction is unrecognized: '+state.ambiguous+' post-event message(s) could not be classified as sent or received ('+(state.directionSamples||[]).join('; ')+'). Fields Bonzo returned: '+(state.fieldNames||[]).join(' ')+'. Outreach remains unverified.';}
   if(state.complete)delete state.previous;
   state={...state,lookupKey:key,checkedAt:new Date().toISOString()};await db.setJSON(key,state);return state;
  }catch(error){

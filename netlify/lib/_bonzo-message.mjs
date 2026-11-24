@@ -44,7 +44,9 @@ export function directionDescription(message){
   if(typeof value==='string')return /^[a-zA-Z0-9_ -]{0,40}$/.test(value)?'string:'+value:'unrecognized string';
   if(typeof value==='object')return 'object';return typeof value;
  };
- return ['direction','message_direction','is_outgoing','outgoing','is_incoming','incoming'].filter(key=>Object.hasOwn(message,key)).map(key=>key+'='+describe(message[key])).join(', ')||'direction field missing';
+ const direction=['direction','message_direction','is_outgoing','outgoing','is_incoming','incoming'].filter(key=>Object.hasOwn(message,key)).map(key=>key+'='+describe(message[key])).join(', ')||'direction field missing';
+ // Type and status are fixed vocabulary, not message content; they show which kind of message could not be classified.
+ return direction+['type','status'].filter(key=>typeof message[key]==='string'&&/^[a-zA-Z0-9_ -]{1,30}$/.test(message[key])).map(key=>', '+key+'='+message[key]).join('');
 }
 
 // Field names only (never values), so the real Bonzo message shape can be read from the admin diagnostic.

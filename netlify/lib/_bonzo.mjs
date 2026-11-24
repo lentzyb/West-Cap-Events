@@ -79,7 +79,7 @@ export function outreachState(row,event,messages,now=Date.now()){
   const usable=c=>Boolean(c)&&c.outcome==='found'&&(c.boundary===undefined||c.boundary===end)&&Date.now()-Date.parse(c.checkedAt)<=checkValidMs;
   // A finished check is trusted for checkValidMs. During a re-check the last finished result stands until the new one lands.
   const verified=check?.revision===lookupRevision&&(check.complete?usable(check):!check.error&&usable(check.previous));
-  if(!verified)return {eligible:false,status:check?.error||check?.outcome==='no_match'?'Bonzo check unverified: '+(check?.error||'No matching prospect visible to this API account'):'Bonzo verification pending',unverified:true};}
+  if(!verified)return {eligible:false,status:check?.error?'Bonzo check unverified: '+check.error:check?.outcome==='no_match'?'Not found in Bonzo: no record with this email or phone under the recruiter or the team':'Bonzo verification pending',unverified:true,...(check?.outcome==='no_match'&&!check?.error?{notFound:true}:{})};}
  return contact?{eligible:false,status:'Contacted in Bonzo',contactedAt:new Date(contact.sentAt).toISOString(),contactType:contact.type,campaign:contact.campaign}:{eligible:true,status:'Needs post-event outreach (none recorded)'};
 }
 export async function bonzoMessages(selectedRows=null){
