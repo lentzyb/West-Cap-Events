@@ -41,6 +41,7 @@ export default async req => {
     if(req.method==='POST') {
       const body=await parseJSON(req)||{},row=rows.find(row=>row.id===body.id);
       if(!row||!['attendee','guest'].includes(body.person)||(body.person==='guest'&&!row.guest))return json({error:'Attendee not found. Refresh and search again.'},404);
+      if(body.person==='guest'&&Object.hasOwn(body,'guestName')&&body.guestName!==row.guest)return json({error:'This plus-one changed. Refresh the attendee list before checking in the guest.'},409);
       if(typeof body.checked!=='boolean')return json({error:'Choose a check-in status.'},400);
       const key=`checkin:${slug}:${row.id}:${body.person}`;
       if(body.operationId){
