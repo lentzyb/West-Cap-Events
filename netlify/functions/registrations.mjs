@@ -1,3 +1,4 @@
+import {duplicatePreview,mergeDuplicates,undoMerge,registrationMergeBusy} from '../lib/_registration-merge.mjs';
 import {queueCandidate,kickWorker,normPhone} from "../lib/_notifications.mjs";
 import crypto from "node:crypto";
 import { json, requireAdmin, parseJSON, clean, slugify, registrationPrefix, readEvent, readRecruiter, listAll, store } from "../lib/_shared.mjs";
@@ -20,6 +21,11 @@ export default async req => {
     const slug = slugify(url.searchParams.get("slug") || "");
     if (!slug) return json({ error: "Event slug is required." }, 400);
 
+    const action=url.searchParams.get('action');
+    if(req.method==='POST'&&['merge-duplicates','undo-merge'].includes(action)){
+      const auth=requireAdmin(req);if(!auth.ok)return auth.response;
+      try{const body=await parseJSON(req)||{};if(action==='merge-duplicates'){if(body.batchId&&!/^[a-f0-9-]{36}$/.test(body.batchId))return json({error:'Choose a valid merge batch.'},400);return json(await mergeDuplicates(slug,{batchId:body.batchId}));}if(!/^[a-f0-9-]{36}$/.test(body.batchId||''))return json({error:'Choose a valid merge batch.'},400);return json(await undoMerge(slug,body.batchId));}catch(error){return json({error:error.message},409);}
+    }
     if (req.method === "POST") {
       const event = await readEvent(slug);
       if (!event || event.archived) return json({ error: "Event not found." }, 404);
@@ -111,13 +117,15 @@ export default async req => {
     if (!auth.ok) return auth.response;
 
     if(req.method==='PATCH'){
+      if(await registrationMergeBusy(slug))return json({error:'Duplicate cleanup is running. Wait a moment and retry.'},409);
       const body=await parseJSON(req);
       if(!body||typeof body.id!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(body.id)||typeof body.editVersion!=='string')return json({error:'Choose a registration and refresh before editing.'},400);
       const db=store(),keys=[];let cursor;
       do{const page=await db.list(cursor?{prefix:registrationPrefix(slug),cursor}:{prefix:registrationPrefix(slug)});keys.push(...(page.blobs||[]).map(b=>b.key).filter(key=>key.endsWith(':'+body.id)));cursor=page.cursor;}while(cursor);
-      if(!keys.length)return json({error:'Registration not found.'},404);
-      if(keys.length!==1)return json({error:'This registration has duplicate stored records. Contact the event organizer before editing.'},409);
-      const key=keys[0],current=await db.getWithMetadata(key,{type:'json'});
+      const active=[];for(const key of keys){const current=await db.getWithMetadata(key,{type:'json'});if(current&&!current.data.mergedInto)active.push({key,current});}
+      if(!active.length)return json({error:'Registration not found.'},404);
+      if(active.length!==1)return json({error:'This registration has duplicate stored records. Run duplicate cleanup before editing.'},409);
+      const {key,current}=active[0];
       if(!current||current.data.id!==body.id)return json({error:'Registration not found.'},404);
       if(editVersion(current.data)!==body.editVersion)return json({error:'Someone changed this registration. Close the editor, refresh registrations and try again.'},409);
       const next={...current.data};
@@ -135,10 +143,11 @@ export default async req => {
       return json({ok:true,registration:{...next,editVersion:editVersion(next)},attendanceRefreshPending,followupRefreshPending});
     }
 
+    if(req.method==='GET'&&action==='duplicates')return json(await duplicatePreview(slug));
     if (req.method === "GET") {
       const registrations = await listAll(registrationPrefix(slug));
       registrations.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-      return json({ registrations:registrations.map(row=>({...row,editVersion:editVersion(row)})) });
+      return json({ registrations:registrations.map(row=>({...row,editVersion:editVersion(row)})),merge:await store().get('registration-merge-latest:'+slug,{type:'json'}) });
     }
 
     return json({ error: "Method not allowed." }, 405);

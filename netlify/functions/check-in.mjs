@@ -1,3 +1,4 @@
+import {registrationMergeBusy} from '../lib/_registration-merge.mjs';
 import crypto from 'node:crypto';
 import {json,requireAdmin,parseJSON,store,listAll,readEvent,slugify,registrationPrefix} from '../lib/_shared.mjs';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -39,7 +40,8 @@ export default async req => {
     if(!['GET','POST'].includes(req.method))return json({error:'Method not allowed.'},405);
     const rows=await roster(slug);
     if(req.method==='POST') {
-      const body=await parseJSON(req)||{},row=rows.find(row=>row.id===body.id);
+      if(await registrationMergeBusy(slug))return json({error:'Registration cleanup is running. Retry check-in shortly.'},409);
+      const body=await parseJSON(req)||{},alias=await db.get('registration-merge-alias:'+slug+':'+String(body.id||''),{type:'json'}),row=rows.find(row=>row.id===(alias?.targetRowId||body.id));
       if(!row||!['attendee','guest'].includes(body.person)||(body.person==='guest'&&!row.guest))return json({error:'Attendee not found. Refresh and search again.'},404);
       if(body.person==='guest'&&Object.hasOwn(body,'guestName')&&body.guestName!==row.guest)return json({error:'This plus-one changed. Refresh the attendee list before checking in the guest.'},409);
       if(typeof body.checked!=='boolean')return json({error:'Choose a check-in status.'},400);
@@ -66,6 +68,7 @@ export default async req => {
     for(const row of rows){const attendee=lookup.get(row.id+':attendee'),guest=lookup.get(row.id+':guest');row.attendeeAt=attendee&&attendee.checked!==false?attendee.at:'';row.guestAt=row.guest&&guest&&guest.checked!==false?guest.at:'';row.attendeeVersion=attendee?.version||attendee?.at||'';row.guestVersion=guest?.version||guest?.at||'';checked+=Boolean(row.attendeeAt)+Boolean(row.guestAt);}
     const query=normalize(url.searchParams.get('q')).split(' ').filter(Boolean);
     const matches=rows.filter(row=>query.every(word=>normalize(row.name+' '+row.guest).includes(word))).sort((a,b)=>a.name.localeCompare(b.name));
-    return json({event:{name:event.name,date:event.date,location:event.location},total,checked,remaining:total-checked,matched:matches.length,rows:url.searchParams.get('offline')==='1'?matches:matches.slice(0,50)});
+    const aliases=Object.fromEntries((await listAll('registration-merge-alias:'+slug+':')).map(a=>[a.id,a.targetRowId]));
+    return json({aliases,event:{name:event.name,date:event.date,location:event.location},total,checked,remaining:total-checked,matched:matches.length,rows:url.searchParams.get('offline')==='1'?matches:matches.slice(0,50)});
   }catch(error){console.error('Check-in request failed',error.message);return json({error:'Unable to update check-in. Refresh to verify attendance before trying again.'},500);}
 };
