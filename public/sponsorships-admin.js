@@ -31,7 +31,15 @@
 
   function render() {
     const labels = new Map(events.map(event => [event.slug, eventLabel(event)]));
-    const visible = entries.filter(entry => !filter.value || entry.eventSlug === filter.value);
+    const statusOrder = { confirmed: 0, waiting: 1, declined: 2 };
+    const compareText = (a, b) => String(a ?? "").localeCompare(String(b ?? ""), "en", { sensitivity: "base", numeric: true });
+    const visible = entries
+      .filter(entry => !filter.value || entry.eventSlug === filter.value)
+      .sort((a, b) =>
+        (statusOrder[a.status ?? "confirmed"] ?? 3) - (statusOrder[b.status ?? "confirmed"] ?? 3)
+        || compareText(a.sponsor, b.sponsor)
+        || compareText(labels.get(a.eventSlug) ?? a.eventName, labels.get(b.eventSlug) ?? b.eventName)
+        || compareText(a.id, b.id));
     const confirmed = visible.filter(entry => (entry.status ?? "confirmed") === "confirmed");
     const cents = confirmed.reduce((total, entry) => total + entry.amountCents, 0);
     $("sponsorshipTotal").textContent = `${usd.format(cents / 100)} confirmed · ${visible.length} sponsorship${visible.length === 1 ? "" : "s"}`;
